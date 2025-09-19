@@ -1,0 +1,34 @@
+FROM alpine:3.22.1
+
+RUN apk add \
+    cpprestsdk-dev \
+    curl \
+    bash \
+    gdb \
+    cmake \
+    openssl-dev \
+    zlib-dev \
+    build-base \
+    boost-dev \
+    boost-build \
+    git \
+    websocket++ \
+    nlohmann-json
+
+COPY ./backend /src
+COPY ./.gitmodules /src/.gitmodules
+
+WORKDIR /src
+
+RUN git init
+RUN rm -rf /src/build
+RUN rm -rf /src/libraries
+
+RUN git submodule add https://github.com/ggml-org/whisper.cpp.git ./libraries/whisper.cpp
+RUN git submodule add https://github.com/nlohmann/json.git ./libraries/json
+RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./libraries/libdatachannel
+RUN git submodule update --init --recursive
+
+ENTRYPOINT [ "bash", "/src/entrypoint.sh" ]
+CMD [ "sleep", "infinity" ]
+
