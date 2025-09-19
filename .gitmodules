@@ -1,9 +1,9 @@
 [submodule "backend/libraries/whisper.cpp"]
 	path = backend/libraries/whisper.cpp
-	url = https://github.com/ggml-org/whisper.cpp.git
+	url = git@github.com:ggml-org/whisper.cpp.git
 [submodule "backend/libraries/json"]
 	path = backend/libraries/json
-	url = https://github.com/nlohmann/json.git
+	url = git@github.com:nlohmann/json.git
 [submodule "backend/libraries/libdatachannel"]
 	path = backend/libraries/libdatachannel
-	url = https://github.com/paullouisageneau/libdatachannel.git
+	url = git@github.com:paullouisageneau/libdatachannel.git
