@@ -1,3 +1,4 @@
+#pragma once
 #include <rtc/rtc.hpp>
 #include <iostream>
 #include <memory>

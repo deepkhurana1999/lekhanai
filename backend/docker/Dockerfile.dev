@@ -16,7 +16,6 @@ RUN apk add \
     nlohmann-json
 
 COPY ./backend /src
-COPY ./.gitmodules /src/.gitmodules
 
 WORKDIR /src
 
@@ -29,6 +28,6 @@ RUN git submodule add https://github.com/nlohmann/json.git ./libraries/json
 RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./libraries/libdatachannel
 RUN git submodule update --init --recursive
 
-ENTRYPOINT [ "bash", "/src/entrypoint.sh" ]
+# ENTRYPOINT [ "bash", "/src/entrypoint.sh" ]
 CMD [ "sleep", "infinity" ]
 

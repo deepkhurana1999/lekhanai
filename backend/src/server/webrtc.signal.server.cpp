@@ -72,7 +72,7 @@ namespace hikki
         }
     }
 
-    void WebRTCSignalingServer::sendSDPToClient(const std::string &sdp) override
+    void WebRTCSignalingServer::sendSDPToClient(const std::string &sdp)
     {
         // Find the corresponding WebSocket connection and send SDP
         json response = {
@@ -88,7 +88,7 @@ namespace hikki
         }
     }
 
-    void WebRTCSignalingServer::sendCandidateToClient(const std::string &candidate, const std::string &mid) override
+    void WebRTCSignalingServer::sendCandidateToClient(const std::string &candidate, const std::string &mid)
     {
         json response = {
             {"type", "ice-candidate"},
