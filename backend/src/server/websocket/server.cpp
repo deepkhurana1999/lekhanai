@@ -2,8 +2,7 @@
 #include <websocketpp/server.hpp>
 #include <nlohmann/json.hpp>
 #include "server/websocket/server.hpp"
-#include "processors/audio.processor.hpp"
-#include "processors/voice.processor.hpp"
+#include "processors/index.hpp"
 
 using json = nlohmann::json;
 namespace hikki
@@ -35,25 +34,25 @@ namespace hikki
         wsServer.run();
     }
 
+    void WebSocketServer::setRequestProcessor(Processor *processor)
+    {
+        requestProcessor = processor;
+    }
+
     void WebSocketServer::handleWebSocketMessage(websocketpp::connection_hdl hdl, server::message_ptr msg)
     {
         try
         {
             if (msg->get_opcode() == websocketpp::frame::opcode::binary)
             {
-                AudioProcessor *audioProcessor = new AudioProcessor();
-                std::vector<float> pcmData = audioProcessor->decode(msg->get_payload());
-                VoiceProcessor *voiceProcessor = new VoiceProcessor("models/ggml-small.bin");
-                std::string transcription = voiceProcessor->transcribe(pcmData);
+                std::vector<float> pcmData = requestProcessor->handleAudioDecode(msg->get_payload());
+                std::string transcription = requestProcessor->handleVoiceTranscribe(pcmData);
 
                 json response{
                     {"type", "transcription"},
                     {"text", transcription},
                 };
                 wsServer.send(hdl, response.dump(), websocketpp::frame::opcode::text);
-
-                delete audioProcessor;
-                delete voiceProcessor;
             }
         }
         catch (const std::exception &e)
