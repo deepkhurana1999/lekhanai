@@ -1,8 +1,8 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 #include <nlohmann/json.hpp>
-#include "server/webrtc.server.hpp"
-#include "server/webrtc.signal.server.hpp"
+#include "server/webrtc/server.hpp"
+#include "server/webrtc/signal.server.hpp"
 
 using json = nlohmann::json;
 namespace hikki

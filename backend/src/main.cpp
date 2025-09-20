@@ -3,7 +3,7 @@
 #include <whisper.h>
 #include <iostream>
 #include <thread>
-#include "server/webrtc.signal.server.hpp"
+#include "server/server.hpp"
 
 namespace hikki
 {
@@ -43,8 +43,8 @@ namespace hikki
     {
         try
         {
-            WebRTCSignalingServer server;
-            server.run(8080);
+            Server server;
+            server.run(8080, ServerType::WebSocket);
         }
         catch (const std::exception &e)
         {

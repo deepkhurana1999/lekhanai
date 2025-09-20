@@ -1,6 +1,6 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
-#include "webrtc.server.hpp"
+#include "server.hpp"
 
 namespace hikki
 {
