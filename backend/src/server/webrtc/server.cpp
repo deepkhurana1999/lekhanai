@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <functional>
-#include "server/webrtc.server.hpp"
+#include "server/webrtc/server.hpp"
 
 namespace hikki
 {

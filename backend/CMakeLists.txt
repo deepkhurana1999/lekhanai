@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28.3)
 project(hikki-backend)
 set(CMAKE_CXX_STANDARD 23)
 
-file(GLOB SOURCES src/*.cpp src/**/*.cpp)
+file(GLOB SOURCES src/*.cpp src/**/*.cpp src/**/**/*.cpp)
 find_package(cpprestsdk REQUIRED)
 find_package(Threads REQUIRED)
 set(USE_SYSTEM_JSON ON CACHE BOOL "" FORCE)
