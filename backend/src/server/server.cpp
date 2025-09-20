@@ -1,4 +1,5 @@
 #include "server/server.hpp"
+#include "processors/index.hpp"
 #include "server/websocket/server.hpp"
 #include "server/webrtc/signal.server.hpp"
 
@@ -15,6 +16,8 @@ namespace hikki
         if (type == ServerType::WebSocket)
         {
             WebSocketServer wsServer;
+            Processor *processor = new Processor();
+            wsServer.setRequestProcessor(processor);
             wsServer.run(port);
         }
         else if (type == ServerType::WebRTCSignaling)
