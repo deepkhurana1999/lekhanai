@@ -1,0 +1,15 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend/docker/Dockerfile.dev
+    container_name: hikki-backend
+    env_file:
+      - ./backend/template.env
+    ports:
+      - "8080:8080"
+    command: sh -c "cd /app && ./build/hikki-backend"
+    networks:
+      - hikki-network
+networks:
+  hikki-network:

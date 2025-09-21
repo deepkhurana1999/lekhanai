@@ -15,13 +15,13 @@ RUN apk add \
     websocket++ \
     nlohmann-json
 
-COPY ./backend /src
+COPY ./backend /app
 
-WORKDIR /src
+WORKDIR /app
 
 RUN git init
-RUN rm -rf /src/build
-RUN rm -rf /src/libraries
+RUN rm -rf /app/build
+RUN rm -rf /app/libraries
 
 RUN git submodule add https://github.com/ggml-org/whisper.cpp.git ./libraries/whisper.cpp
 RUN git submodule add https://github.com/nlohmann/json.git ./libraries/json
@@ -29,8 +29,7 @@ RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./l
 RUN git submodule update --init --recursive
 
 RUN mkdir /models
-RUN /src/libraries/whisper.cpp/models/download-ggml-model.sh small /models
+RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh small /models
 
-# ENTRYPOINT [ "bash", "/src/entrypoint.sh" ]
-CMD [ "sleep", "infinity" ]
+ENTRYPOINT [ "bash", "/app/entrypoint.sh" ]
 
