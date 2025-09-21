@@ -6,7 +6,7 @@ namespace hikki
 {
     struct Config
     {
-        std::string serverPort;
+        int serverPort;
         std::string modelPath;
     };
 
@@ -17,5 +17,7 @@ namespace hikki
 
     private:
         static std::string get(const std::string &key);
+        static Config config;
+        static bool initialized;
     };
 }

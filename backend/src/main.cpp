@@ -4,47 +4,17 @@
 #include <iostream>
 #include <thread>
 #include "server/server.hpp"
+#include "config/index.hpp"
 
 namespace hikki
 {
-    int main1()
-    {
-        std::cout << "Testing library integration..." << std::endl;
-
-        // Test libdatachannel
-        try
-        {
-            rtc::Configuration config;
-            std::cout << "✓ libdatachannel: OK" << std::endl;
-        }
-        catch (const std::exception &e)
-        {
-            std::cout << "✗ libdatachannel: " << e.what() << std::endl;
-        }
-
-        // Test whisper.cpp
-        const char *whisper_version = whisper_print_system_info();
-        if (whisper_version)
-        {
-            std::cout << "✓ whisper.cpp: OK" << std::endl;
-            std::cout << "  System info: " << whisper_version << std::endl;
-        }
-        else
-        {
-            std::cout << "✗ whisper.cpp: Failed to get system info" << std::endl;
-        }
-
-        std::cout << "Hardware threads: " << std::thread::hardware_concurrency() << std::endl;
-
-        return 0;
-    }
-
     int main()
     {
         try
         {
             Server server;
-            server.run(8080, ServerType::WebSocket);
+            Config config = Environment::getConfig();
+            server.run(config.serverPort, ServerType::WebSocket);
         }
         catch (const std::exception &e)
         {
