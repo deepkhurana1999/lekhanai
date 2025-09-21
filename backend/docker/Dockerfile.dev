@@ -29,7 +29,7 @@ RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./l
 RUN git submodule update --init --recursive
 
 RUN mkdir /models
-RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh small /models
+RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh tiny /models
 
 ENTRYPOINT [ "bash", "/app/entrypoint.sh" ]
 

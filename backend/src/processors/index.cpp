@@ -1,13 +1,14 @@
+#include "config/index.hpp"
 #include "processors/index.hpp"
 #include "processors/audio.processor.hpp"
 #include "processors/voice.processor.hpp"
-
 namespace hikki
 {
     Processor::Processor()
     {
+        Config config = Environment::getConfig();
         audioProcessor = new AudioProcessor();
-        voiceProcessor = new VoiceProcessor("/models/ggml-small.bin");
+        voiceProcessor = new VoiceProcessor(config.modelPath);
     }
 
     std::vector<float> Processor::handleAudioDecode(const std::string &audioData)
