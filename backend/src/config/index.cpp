@@ -5,10 +5,18 @@
 
 namespace hikki
 {
+    Config Environment::config{};
+    bool Environment::initialized = false;
+
     Config Environment::getConfig()
     {
-        Config config;
-        config.serverPort = get("SERVER_PORT");
+        if (initialized)
+        {
+            return config;
+        }
+        config = Config();
+        initialized = true;
+        config.serverPort = std::stoi(get("SERVER_PORT"));
         config.modelPath = get("MODEL_PATH");
         return config;
     }
