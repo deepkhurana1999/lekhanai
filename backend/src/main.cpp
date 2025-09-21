@@ -1,4 +1,3 @@
-// src/test_setup.cpp
 #include <rtc/rtc.hpp>
 #include <whisper.h>
 #include <iostream>
