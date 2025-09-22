@@ -28,6 +28,9 @@ RUN git submodule add https://github.com/ggml-org/whisper.cpp.git ./libraries/wh
 RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./libraries/libdatachannel
 RUN git submodule update --init --recursive
 
+RUN cd libraries/libdatachannel && git checkout v0.23.2
+RUN cd libraries/whisper.cpp && git checkout v1.7.6
+
 RUN mkdir /models
 RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh tiny /models
 
