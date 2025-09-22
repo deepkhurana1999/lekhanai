@@ -3,7 +3,7 @@
 #include "server/websocket/server.hpp"
 #include "server/webrtc/signal.server.hpp"
 
-namespace hikki
+namespace srotalekh
 {
 
     void Server::run(int port, ServerType type)

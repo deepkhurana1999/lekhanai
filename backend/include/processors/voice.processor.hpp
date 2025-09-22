@@ -4,7 +4,7 @@
 #include <vector>
 #include <mutex>
 
-namespace hikki
+namespace srotalekh
 {
     class VoiceProcessor
     {

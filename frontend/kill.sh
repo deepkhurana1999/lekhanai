@@ -1,5 +1,5 @@
 #!/bin/sh
 
-docker stop hikki
-docker rm hikki
-docker image remove hikki
+docker stop srotalekh
+docker rm srotalekh
+docker image remove srotalekh

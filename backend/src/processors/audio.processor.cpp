@@ -5,7 +5,7 @@
 #include "processors/audio.processor.hpp"
 
 using namespace std;
-namespace hikki
+namespace srotalekh
 {
     std::vector<float> AudioProcessor::decode(const std::string &audioData)
     {

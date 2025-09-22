@@ -3,13 +3,13 @@ services:
     build:
       context: .
       dockerfile: ./backend/docker/Dockerfile.dev
-    container_name: hikki-backend
+    container_name: srotalekh-backend
     env_file:
       - ./backend/template.env
     ports:
       - "8080:8080"
-    command: sh -c "cd /app && ./build/hikki-backend"
+    command: sh -c "cd /app && ./build/srotalekh-backend"
     networks:
-      - hikki-network
+      - srotalekh-network
 networks:
-  hikki-network:
+  srotalekh-network:

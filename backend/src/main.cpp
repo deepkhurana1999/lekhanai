@@ -5,7 +5,7 @@
 #include "server/server.hpp"
 #include "config/index.hpp"
 
-namespace hikki
+namespace srotalekh
 {
     int main()
     {
@@ -28,5 +28,5 @@ namespace hikki
 
 int main()
 {
-    return hikki::main();
+    return srotalekh::main();
 }

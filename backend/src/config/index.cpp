@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include "config/index.hpp"
 
-namespace hikki
+namespace srotalekh
 {
     Config Environment::config{};
     bool Environment::initialized = false;

@@ -1,6 +1,6 @@
-# Hikki
+# srotalekh
 
-Hikki is a open-source transcriber, using whisper.cpp.
+srotalekh is a open-source transcriber, using whisper.cpp.
 
 ## Project Structure
 
