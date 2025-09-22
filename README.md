@@ -1,6 +1,6 @@
-# Hikki
+# SrotaLekh
 
-Hikki is a open-source transcriber, using whisper.cpp.
+SrotaLekh ("सुने हुए को लिखना" i.e dictation writing) is a open-source transcriber, using whisper.cpp.
 
 ## Project Structure
 
