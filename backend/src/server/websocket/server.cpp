@@ -5,7 +5,7 @@
 #include "processors/index.hpp"
 
 using json = nlohmann::json;
-namespace hikki
+namespace lekhanai
 {
     WebSocketServer::WebSocketServer()
     {

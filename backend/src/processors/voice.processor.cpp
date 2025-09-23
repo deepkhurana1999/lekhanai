@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace hikki
+namespace lekhanai
 {
     VoiceProcessor::VoiceProcessor(const std::string &modelPath)
     {

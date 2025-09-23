@@ -1,6 +1,6 @@
-# Lekhana AI
+# lekhanai
 
-Lekhana AI is a open-source transcriber, using whisper.cpp.
+LekhanAI is a open-source transcriber, using whisper.cpp.
 
 ## Project Structure
 

@@ -1,5 +1,5 @@
 #!/bin/sh
 
-docker stop hikki-backend
-docker rm hikki-backend
-docker image remove hikki-backend
+docker stop lekhanai-backend
+docker rm lekhanai-backend
+docker image remove lekhanai-backend
