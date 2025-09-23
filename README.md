@@ -1,6 +1,6 @@
-# SrotaLekh
+# Lekhana AI
 
-SrotaLekh ("सुने हुए को लिखना" i.e dictation writing) is a open-source transcriber, using whisper.cpp.
+Lekhana AI is a open-source transcriber, using whisper.cpp.
 
 ## Project Structure
 
