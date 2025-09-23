@@ -5,7 +5,7 @@
 #include "server/webrtc/signal.server.hpp"
 
 using json = nlohmann::json;
-namespace srotalekh
+namespace lekhanai
 {
 
     WebRTCSignalingServer::WebRTCSignalingServer()

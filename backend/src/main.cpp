@@ -5,7 +5,7 @@
 #include "server/server.hpp"
 #include "config/index.hpp"
 
-namespace srotalekh
+namespace lekhanai
 {
     int main()
     {
@@ -28,5 +28,5 @@ namespace srotalekh
 
 int main()
 {
-    return srotalekh::main();
+    return lekhanai::main();
 }

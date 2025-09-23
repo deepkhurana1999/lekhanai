@@ -1,5 +1,5 @@
 #pragma once
-namespace srotalekh
+namespace lekhanai
 {
     enum class ServerType
     {

@@ -2,7 +2,7 @@
 #include <string>
 
 // generate static class to read environment variables
-namespace srotalekh
+namespace lekhanai
 {
     struct Config
     {

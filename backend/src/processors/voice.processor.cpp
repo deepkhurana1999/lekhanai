@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace srotalekh
+namespace lekhanai
 {
     VoiceProcessor::VoiceProcessor(const std::string &modelPath)
     {

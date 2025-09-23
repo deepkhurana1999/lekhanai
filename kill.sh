@@ -1,5 +1,5 @@
 #!/bin/sh
 
-docker stop srotalekh-backend
-docker rm srotalekh-backend
-docker image remove srotalekh-backend
+docker stop lekhanai-backend
+docker rm lekhanai-backend
+docker image remove lekhanai-backend

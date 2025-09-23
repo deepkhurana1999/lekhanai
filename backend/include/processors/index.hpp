@@ -2,7 +2,7 @@
 #include "audio.processor.hpp"
 #include "voice.processor.hpp"
 
-namespace srotalekh
+namespace lekhanai
 {
     class Processor
     {

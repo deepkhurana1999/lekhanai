@@ -5,7 +5,7 @@
 #include <string>
 #include <functional>
 
-namespace srotalekh
+namespace lekhanai
 {
     class WebRTCServer
     {

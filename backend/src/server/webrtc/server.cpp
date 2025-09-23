@@ -5,7 +5,7 @@
 #include <functional>
 #include "server/webrtc/server.hpp"
 
-namespace srotalekh
+namespace lekhanai
 {
     WebRTCServer::WebRTCServer()
     {

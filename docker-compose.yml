@@ -3,13 +3,13 @@ services:
     build:
       context: .
       dockerfile: ./backend/docker/Dockerfile.dev
-    container_name: srotalekh-backend
+    container_name: lekhanai-backend
     env_file:
       - ./backend/template.env
     ports:
       - "8080:8080"
-    command: sh -c "cd /app && ./build/srotalekh-backend"
+    command: sh -c "cd /app && ./build/lekhanai-backend"
     networks:
-      - srotalekh-network
+      - lekhanai-network
 networks:
-  srotalekh-network:
+  lekhanai-network:

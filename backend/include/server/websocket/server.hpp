@@ -3,7 +3,7 @@
 #include <websocketpp/server.hpp>
 #include "processors/index.hpp"
 
-namespace srotalekh
+namespace lekhanai
 {
     class WebSocketServer
     {

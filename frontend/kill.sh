@@ -1,5 +1,5 @@
 #!/bin/sh
 
-docker stop srotalekh
-docker rm srotalekh
-docker image remove srotalekh
+docker stop lekhanai
+docker rm lekhanai
+docker image remove lekhanai

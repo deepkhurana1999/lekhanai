@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-namespace srotalekh
+namespace lekhanai
 {
     class AudioProcessor
     {

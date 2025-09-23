@@ -17,7 +17,7 @@
 	cmake -B build -DCMAKE_BUILD_TYPE=Release
 	cmake --build build -j
 	```
-- The backend binary is built as `build/srotalekh-backend`.
+- The backend binary is built as `build/lekhanai-backend`.
 
 ### Code Style
 - Follow modern C++ best practices (RAII, smart pointers, const-correctness).

@@ -4,7 +4,7 @@
 #include <vector>
 #include <mutex>
 
-namespace srotalekh
+namespace lekhanai
 {
     class VoiceProcessor
     {
