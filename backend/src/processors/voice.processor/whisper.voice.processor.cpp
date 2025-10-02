@@ -1,11 +1,12 @@
-#include "processors/voice.processor.hpp"
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include "processors/voice.processor/voice.processor.hpp"
+#include "processors/voice.processor/whisper.voice.processor.hpp"
 
-namespace hikki
+namespace lekhanai
 {
-    VoiceProcessor::VoiceProcessor(const std::string &modelPath)
+    WhisperVoiceProcessor::WhisperVoiceProcessor(const std::string &modelPath) : VoiceProcessor(modelPath)
     {
         whisperCtx = whisper_init_from_file(modelPath.c_str());
         if (!whisperCtx)
@@ -14,7 +15,7 @@ namespace hikki
         }
     }
 
-    VoiceProcessor::~VoiceProcessor()
+    WhisperVoiceProcessor::~WhisperVoiceProcessor()
     {
         if (whisperCtx)
         {
@@ -23,9 +24,9 @@ namespace hikki
         }
     }
 
-    std::string VoiceProcessor::transcribe(const std::vector<float> &pcmData)
+    std::string WhisperVoiceProcessor::process(const std::vector<float> &pcmData)
     {
-        std::lock_guard<std::mutex> lock(whisperMutex);
+        std::lock_guard<std::mutex> lock(threadMutex);
 
         auto params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
         params.language = "en";

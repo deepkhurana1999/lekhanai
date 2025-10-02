@@ -1,5 +1,5 @@
 #!/bin/bash
 set -e
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j --config Release
+cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j --config Debug
 exec "$@"

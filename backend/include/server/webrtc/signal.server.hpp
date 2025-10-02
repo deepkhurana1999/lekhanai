@@ -2,7 +2,7 @@
 #include <websocketpp/server.hpp>
 #include "server.hpp"
 
-namespace hikki
+namespace lekhanai
 {
     class WebRTCSignalingServer : public WebRTCServer
     {

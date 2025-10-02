@@ -5,7 +5,7 @@
 #include <string>
 #include <functional>
 
-namespace hikki
+namespace lekhanai
 {
     class WebRTCServer
     {

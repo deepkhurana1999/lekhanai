@@ -2,12 +2,13 @@
 #include <string>
 
 // generate static class to read environment variables
-namespace hikki
+namespace lekhanai
 {
     struct Config
     {
         int serverPort;
         std::string modelPath;
+        std::string vadModelPath;
     };
 
     class Environment

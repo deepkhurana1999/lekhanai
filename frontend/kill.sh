@@ -1,5 +1,5 @@
 #!/bin/sh
 
-docker stop hikki
-docker rm hikki
-docker image remove hikki
+docker stop lekhanai
+docker rm lekhanai
+docker image remove lekhanai

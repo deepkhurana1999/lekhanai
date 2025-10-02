@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include "config/index.hpp"
 
-namespace hikki
+namespace lekhanai
 {
     Config Environment::config{};
     bool Environment::initialized = false;
@@ -18,6 +18,7 @@ namespace hikki
         initialized = true;
         config.serverPort = std::stoi(get("SERVER_PORT"));
         config.modelPath = get("MODEL_PATH");
+        config.vadModelPath = get("VAD_MODEL_PATH");
         return config;
     }
 

@@ -2,11 +2,11 @@
 #include <string>
 #include <vector>
 
-namespace hikki
+namespace lekhanai
 {
     class AudioProcessor
     {
     public:
-        std::vector<float> decode(const std::string &audioData);
+        std::vector<float> process(const std::string &audioData);
     };
 }

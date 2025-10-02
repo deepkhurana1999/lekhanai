@@ -1,5 +1,5 @@
 #pragma once
-namespace hikki
+namespace lekhanai
 {
     enum class ServerType
     {

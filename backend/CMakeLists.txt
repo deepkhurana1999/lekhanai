@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.28.3)
-project(hikki-backend)
+project(lekhanai-backend)
 set(CMAKE_CXX_STANDARD 23)
 
 file(GLOB SOURCES src/*.cpp src/**/*.cpp src/**/**/*.cpp)
 find_package(cpprestsdk REQUIRED)
 find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
+
+# Use the official CMake config instead of manual find_library
+find_package(onnxruntime REQUIRED)
 
 set(USE_SYSTEM_JSON ON CACHE BOOL "" FORCE)
 message(STATUS "Project build type: ${CMAKE_BUILD_TYPE}")
@@ -43,15 +46,19 @@ if(NOT WEBSOCKETPP_INCLUDE_DIR)
 message(FATAL_ERROR "Could not find WebSocket++ headers. Please install websocket++ package.")
 endif()
 
-add_executable(hikki-backend ${SOURCES})
+add_executable(lekhanai-backend ${SOURCES})
 add_subdirectory(libraries/libdatachannel)
 add_subdirectory(libraries/whisper.cpp)
 
-target_link_libraries(hikki-backend PRIVATE whisper)
-target_link_libraries(hikki-backend PRIVATE datachannel)
-target_link_libraries(hikki-backend PRIVATE cpprestsdk::cpprest)
-target_link_libraries(hikki-backend PRIVATE nlohmann_json::nlohmann_json)
-target_include_directories(hikki-backend PRIVATE ${WEBSOCKETPP_INCLUDE_DIR})
-target_include_directories(hikki-backend PRIVATE include/)
-target_include_directories(hikki-backend PRIVATE libraries/whisper.cpp/include)
-target_include_directories(hikki-backend PRIVATE libraries/libdatachannel/include)
+# Link libraries
+target_link_libraries(lekhanai-backend PRIVATE whisper)
+target_link_libraries(lekhanai-backend PRIVATE datachannel)
+target_link_libraries(lekhanai-backend PRIVATE cpprestsdk::cpprest)
+target_link_libraries(lekhanai-backend PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(lekhanai-backend PRIVATE onnxruntime::onnxruntime)
+
+# Include directories
+target_include_directories(lekhanai-backend PRIVATE ${WEBSOCKETPP_INCLUDE_DIR})
+target_include_directories(lekhanai-backend PRIVATE include/)
+target_include_directories(lekhanai-backend PRIVATE libraries/whisper.cpp/include)
+target_include_directories(lekhanai-backend PRIVATE libraries/libdatachannel/include)
