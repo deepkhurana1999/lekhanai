@@ -27,9 +27,9 @@ namespace lekhanai
         const int min_silence_samples_at_max_speech = sr_per_ms * 98;
 
         audio_processor = new AudioProcessor();
-        voice_processor = VoiceProcessorFactory().create(config.modelPath, "whisper");
+        voice_processor = VoiceProcessorFactory().create(config.model_path, "whisper");
         vad_processor = VADProcessorFactory().create(
-            config.vadModelPath,
+            config.vad_model_path,
             "silero",
             windows_frame_size,
             sample_rate,

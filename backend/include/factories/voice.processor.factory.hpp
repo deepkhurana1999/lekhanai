@@ -8,6 +8,6 @@ namespace lekhanai
     {
     public:
         VoiceProcessorFactory();
-        VoiceProcessor *create(const std::string &modelPath, const std::string &type);
+        VoiceProcessor *create(const std::string &model_path, const std::string &type);
     };
 }

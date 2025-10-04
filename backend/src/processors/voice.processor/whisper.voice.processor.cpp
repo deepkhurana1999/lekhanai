@@ -6,12 +6,12 @@
 
 namespace lekhanai
 {
-    WhisperVoiceProcessor::WhisperVoiceProcessor(const std::string &modelPath) : VoiceProcessor(modelPath)
+    WhisperVoiceProcessor::WhisperVoiceProcessor(const std::string &model_path) : VoiceProcessor(model_path)
     {
-        whisperCtx = whisper_init_from_file(modelPath.c_str());
+        whisperCtx = whisper_init_from_file(model_path.c_str());
         if (!whisperCtx)
         {
-            throw std::runtime_error("Failed to load Whisper model at " + modelPath);
+            throw std::runtime_error("Failed to load Whisper model at " + model_path);
         }
     }
 

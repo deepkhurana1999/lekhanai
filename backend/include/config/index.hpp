@@ -6,9 +6,9 @@ namespace lekhanai
 {
     struct Config
     {
-        int serverPort;
-        std::string modelPath;
-        std::string vadModelPath;
+        int server_port;
+        std::string model_path;
+        std::string vad_model_path;
     };
 
     class Environment

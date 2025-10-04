@@ -3,8 +3,7 @@
 
 namespace lekhanai
 {
-    VoiceProcessor::VoiceProcessor(const std::string &mPath)
+    VoiceProcessor::VoiceProcessor(const std::string &model_path) : model_path(model_path)
     {
-        modelPath = mPath;
     }
 }

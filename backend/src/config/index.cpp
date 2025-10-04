@@ -16,9 +16,9 @@ namespace lekhanai
         }
         config = Config();
         initialized = true;
-        config.serverPort = std::stoi(get("SERVER_PORT"));
-        config.modelPath = get("MODEL_PATH");
-        config.vadModelPath = get("VAD_MODEL_PATH");
+        config.server_port = std::stoi(get("SERVER_PORT"));
+        config.model_path = get("MODEL_PATH");
+        config.vad_model_path = get("VAD_MODEL_PATH");
         return config;
     }
 
