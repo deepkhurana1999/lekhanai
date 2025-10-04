@@ -62,6 +62,8 @@ namespace lekhanai
             std::copy(context.begin(), context.end(), chunk_with_context.begin());
             std::copy(chunk.begin(), chunk.end(), chunk_with_context.begin() + context_samples);
 
+            // note: process the chunk with context to get speech probability
+            // the state is updated within the vad_processor
             float speech_prob = vad_processor->process(chunk_with_context, state);
             current_sample += static_cast<unsigned int>(window_size_samples); // Advance by the original window size.
 
