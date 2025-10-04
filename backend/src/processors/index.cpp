@@ -1,3 +1,4 @@
+#include "constants.hpp"
 #include "config/index.hpp"
 #include "processors/index.hpp"
 #include "factories/vad.processor.factory.hpp"
@@ -27,10 +28,10 @@ namespace lekhanai
         const int min_silence_samples_at_max_speech = sr_per_ms * 98;
 
         audio_processor = new AudioProcessor();
-        voice_processor = VoiceProcessorFactory().create(config.model_path, "whisper");
+        voice_processor = VoiceProcessorFactory().create(config.model_path, STT_MODEL::WHISPER);
         vad_processor = VADProcessorFactory().create(
             config.vad_model_path,
-            "silero",
+            VAD_MODEL::SILERO,
             windows_frame_size,
             sample_rate,
             effective_window_size);
