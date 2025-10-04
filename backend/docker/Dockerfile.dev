@@ -1,39 +1,56 @@
-FROM alpine:3.22.1
+FROM debian:trixie-slim
 
-RUN apk add \
-    cpprestsdk-dev \
+# Update package lists and install dependencies
+RUN apt-get update && apt-get install -y \
+    libcpprest-dev \
     curl \
     wget \
     bash \
     gdb \
     cmake \
-    openssl-dev \
-    zlib-dev \
-    build-base \
-    boost-dev \
-    boost-build \
+    libssl-dev \
+    zlib1g-dev \
+    build-essential \
+    libboost-all-dev \
     git \
-    websocket++ \
-    nlohmann-json \
-    openblas-dev
+    nlohmann-json3-dev \
+    libopenblas-dev \
+    pkg-config \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ONNX Runtime (for Silero VAD support)
+RUN apt-get update && apt-get install -y \
+    libonnxruntime-dev \
+    || echo "ONNX Runtime dev package not available, using pip version"
 
 COPY ./backend /app
 
 WORKDIR /app
 
+# Initialize git and clean up
 RUN git init
 RUN rm -rf /app/build
 RUN rm -rf /app/libraries
 
+# Add git submodules
 RUN git submodule add https://github.com/ggml-org/whisper.cpp.git ./libraries/whisper.cpp
 RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./libraries/libdatachannel
 RUN git submodule update --init --recursive
 
+# Checkout specific versions
 RUN cd libraries/libdatachannel && git checkout v0.23.2
 RUN cd libraries/whisper.cpp && git checkout v1.7.6
 
+# Create models directory and download whisper model
 RUN mkdir /models
 RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh tiny /models
 
-ENTRYPOINT [ "bash", "/app/entrypoint.sh" ]
+# Download Silero VAD model for Voice Activity Detection
+RUN mkdir -p /models/vad && \
+    wget -O /models/vad/silero_vad.onnx \
+    https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx
 
+ENTRYPOINT [ "bash", "/app/entrypoint.sh" ]

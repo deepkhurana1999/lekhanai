@@ -45,14 +45,28 @@ namespace lekhanai
         {
             if (msg->get_opcode() == websocketpp::frame::opcode::binary)
             {
-                std::vector<float> pcmData = requestProcessor->handleAudioDecode(msg->get_payload());
-                std::string transcription = requestProcessor->handleVoiceTranscribe(pcmData);
+                std::vector<float> audio_data = requestProcessor->getDecodedAudio(msg->get_payload());
+                auto speech_segments = requestProcessor->getSpeechSegments(audio_data);
+                if (speech_segments.empty())
+                {
+                    json response{
+                        {"type", "transcription"},
+                        {"text", ""},
+                        {"vad_score", 0.0}};
+                    wsServer.send(hdl, response.dump(), websocketpp::frame::opcode::text);
+                    return;
+                }
 
-                json response{
-                    {"type", "transcription"},
-                    {"text", transcription},
-                };
-                wsServer.send(hdl, response.dump(), websocketpp::frame::opcode::text);
+                for (const auto &segment : speech_segments)
+                {
+                    std::vector<float> segmented_audio(audio_data.begin() + segment.start, audio_data.begin() + segment.end + 1);
+                    std::string transcription = requestProcessor->getVoiceTranscription(segmented_audio);
+                    json response{
+                        {"type", "transcription"},
+                        {"text", transcription},
+                        {"vad_score", 1.0}};
+                    wsServer.send(hdl, response.dump(), websocketpp::frame::opcode::text);
+                }
             }
         }
         catch (const std::exception &e)

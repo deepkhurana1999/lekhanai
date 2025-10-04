@@ -1,0 +1,9 @@
+#include <string>
+#include "processors/voice.processor/voice.processor.hpp"
+
+namespace lekhanai
+{
+    VoiceProcessor::VoiceProcessor(const std::string &model_path) : model_path(model_path)
+    {
+    }
+}

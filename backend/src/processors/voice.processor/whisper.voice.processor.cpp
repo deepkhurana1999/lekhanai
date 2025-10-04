@@ -1,20 +1,21 @@
-#include "processors/voice.processor.hpp"
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include "processors/voice.processor/voice.processor.hpp"
+#include "processors/voice.processor/whisper.voice.processor.hpp"
 
 namespace lekhanai
 {
-    VoiceProcessor::VoiceProcessor(const std::string &modelPath)
+    WhisperVoiceProcessor::WhisperVoiceProcessor(const std::string &model_path) : VoiceProcessor(model_path)
     {
-        whisperCtx = whisper_init_from_file(modelPath.c_str());
+        whisperCtx = whisper_init_from_file(model_path.c_str());
         if (!whisperCtx)
         {
-            throw std::runtime_error("Failed to load Whisper model at " + modelPath);
+            throw std::runtime_error("Failed to load Whisper model at " + model_path);
         }
     }
 
-    VoiceProcessor::~VoiceProcessor()
+    WhisperVoiceProcessor::~WhisperVoiceProcessor()
     {
         if (whisperCtx)
         {
@@ -23,9 +24,9 @@ namespace lekhanai
         }
     }
 
-    std::string VoiceProcessor::transcribe(const std::vector<float> &pcmData)
+    std::string WhisperVoiceProcessor::process(const std::vector<float> &pcmData)
     {
-        std::lock_guard<std::mutex> lock(whisperMutex);
+        std::lock_guard<std::mutex> lock(threadMutex);
 
         auto params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
         params.language = "en";

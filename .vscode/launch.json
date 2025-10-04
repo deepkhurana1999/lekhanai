@@ -1,0 +1,86 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug in Docker (pipeTransport)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/app/build/lekhanai-backend",
+            "stopAtEntry": false,
+            "cwd": "/app",
+            "args": [],
+            "pipeTransport": {
+                "pipeProgram": "docker",
+                "pipeArgs": [
+                    "exec",
+                    "-i",
+                    "lekhanai-backend",
+                    "bash",
+                    "-c"
+                ],
+                "pipeCwd": "${workspaceFolder}",
+                "debuggerPath": "/usr/bin/gdb"
+            },
+            "sourceFileMap": {
+                "/app": "${workspaceFolder}/backend",
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set sysroot",
+                    "text": "set sysroot /usr/local",
+                    "ignoreFailures": false
+                },
+                {
+                    "description": "Set solib-absolute-prefix",
+                    "text": "set solib-absolute-prefix /usr/local",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "C/C++: g++ build and debug active file",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/lekhanai-backend",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "POC",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/app/app_test/test",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "/app/app_test",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

@@ -2,12 +2,12 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
-#include "processors/audio.processor.hpp"
+#include "processors/audio.processor/audio.processor.hpp"
 
 using namespace std;
 namespace lekhanai
 {
-    std::vector<float> AudioProcessor::decode(const std::string &audioData)
+    std::vector<float> AudioProcessor::process(const std::string &audioData)
     {
         // Each PCM sample is 2 bytes (int16_t)
         if (audioData.size() % 2 != 0)

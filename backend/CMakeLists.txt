@@ -7,6 +7,9 @@ find_package(cpprestsdk REQUIRED)
 find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
+# Use the official CMake config instead of manual find_library
+find_package(onnxruntime REQUIRED)
+
 set(USE_SYSTEM_JSON ON CACHE BOOL "" FORCE)
 message(STATUS "Project build type: ${CMAKE_BUILD_TYPE}")
 
@@ -47,10 +50,14 @@ add_executable(lekhanai-backend ${SOURCES})
 add_subdirectory(libraries/libdatachannel)
 add_subdirectory(libraries/whisper.cpp)
 
+# Link libraries
 target_link_libraries(lekhanai-backend PRIVATE whisper)
 target_link_libraries(lekhanai-backend PRIVATE datachannel)
 target_link_libraries(lekhanai-backend PRIVATE cpprestsdk::cpprest)
 target_link_libraries(lekhanai-backend PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(lekhanai-backend PRIVATE onnxruntime::onnxruntime)
+
+# Include directories
 target_include_directories(lekhanai-backend PRIVATE ${WEBSOCKETPP_INCLUDE_DIR})
 target_include_directories(lekhanai-backend PRIVATE include/)
 target_include_directories(lekhanai-backend PRIVATE libraries/whisper.cpp/include)

@@ -13,7 +13,7 @@ namespace lekhanai
         {
             Server server;
             Config config = Environment::getConfig();
-            server.run(config.serverPort, ServerType::WebSocket);
+            server.run(config.server_port, ServerType::WebSocket);
         }
         catch (const std::exception &e)
         {
