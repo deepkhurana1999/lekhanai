@@ -7,11 +7,11 @@
 namespace lekhanai
 {
     VoiceProcessorFactory::VoiceProcessorFactory() = default;
-    VoiceProcessor *VoiceProcessorFactory::create(const std::string &model_path, const STT_MODEL type)
+    VoiceProcessor *VoiceProcessorFactory::create(const std::string &model_path, const STT_MODEL type, int n_threads, int n_processors)
     {
         if (type == STT_MODEL::WHISPER)
         {
-            return new WhisperVoiceProcessor(model_path);
+            return new WhisperVoiceProcessor(model_path, n_threads, n_processors);
         }
 
         throw std::invalid_argument("Unsupported voice processor type: " + type);

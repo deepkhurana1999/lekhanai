@@ -9,6 +9,6 @@ namespace lekhanai
     {
     public:
         VoiceProcessorFactory();
-        VoiceProcessor *create(const std::string &model_path, const STT_MODEL type);
+        VoiceProcessor *create(const std::string &model_path, const STT_MODEL type, int n_threads, int n_processors);
     };
 }

@@ -27,8 +27,12 @@ namespace lekhanai
         const int min_silence_samples = sr_per_ms * min_silence_duration_ms;
         const int min_silence_samples_at_max_speech = sr_per_ms * 98;
 
+        // Initialize processors
+        const int n_threads = 4;
+        const int n_processors = 1;
+
         audio_processor = new AudioProcessor();
-        voice_processor = VoiceProcessorFactory().create(config.model_path, STT_MODEL::WHISPER);
+        voice_processor = VoiceProcessorFactory().create(config.model_path, STT_MODEL::WHISPER, n_threads, n_processors);
         vad_processor = VADProcessorFactory().create(
             config.vad_model_path,
             VAD_MODEL::SILERO,

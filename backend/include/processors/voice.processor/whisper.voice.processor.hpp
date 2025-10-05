@@ -10,7 +10,7 @@ namespace lekhanai
     class WhisperVoiceProcessor : public VoiceProcessor
     {
     public:
-        explicit WhisperVoiceProcessor(const std::string &model_path);
+        explicit WhisperVoiceProcessor(const std::string &model_path, int n_threads, int n_processors);
         ~WhisperVoiceProcessor();
 
         std::string process(const std::vector<float> &pcmData) override;
