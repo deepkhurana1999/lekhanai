@@ -39,7 +39,7 @@ RUN git submodule update --init --recursive
 
 # Checkout specific versions
 RUN cd libraries/libdatachannel && git checkout v0.23.2
-RUN cd libraries/whisper.cpp && git checkout v1.7.6
+RUN cd libraries/whisper.cpp && git checkout v1.8.0
 
 # Create models directory and download whisper model
 RUN mkdir /models
