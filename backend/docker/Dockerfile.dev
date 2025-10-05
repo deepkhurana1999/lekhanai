@@ -26,14 +26,11 @@ RUN apt-get update && apt-get install -y \
     libonnxruntime-dev \
     || echo "ONNX Runtime dev package not available, using pip version"
 
-COPY ./backend /app
 
 WORKDIR /app
 
 # Initialize git and clean up
 RUN git init
-RUN rm -rf /app/build
-RUN rm -rf /app/libraries
 
 # Add git submodules
 RUN git submodule add https://github.com/ggml-org/whisper.cpp.git ./libraries/whisper.cpp
@@ -52,5 +49,11 @@ RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh tiny /models
 RUN mkdir -p /models/vad && \
     wget -O /models/vad/silero_vad.onnx \
     https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx
+
+# Copy application files
+COPY ./backend/include /app/include
+COPY ./backend/src /app/src
+COPY ./backend/CMakeLists.txt /app/CMakeLists.txt
+COPY ./backend/entrypoint.sh /app/entrypoint.sh
 
 ENTRYPOINT [ "bash", "/app/entrypoint.sh" ]
