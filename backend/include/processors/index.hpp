@@ -12,9 +12,7 @@ namespace lekhanai
     {
     public:
         Processor();
-        std::vector<float> getDecodedAudio(const std::string &audioData);
-        std::string getVoiceTranscription(const std::vector<float> &pcmData);
-        std::vector<SpeechSegment> getSpeechSegments(const std::vector<float> &pcmData);
+        std::vector<std::string> process(const std::string &raw_audio);
         ~Processor();
 
     private:
@@ -22,5 +20,8 @@ namespace lekhanai
         VoiceProcessor *voice_processor;
         VADProcessor *vad_processor;
         VADAudioProcessor *vad_audio_processor;
+        std::vector<float> getDecodedAudio(const std::string &raw_audio);
+        std::string getVoiceTranscription(const std::vector<std::vector<float>> &audio);
+        std::vector<SpeechSegment> getSpeechSegments(const std::vector<float> &audio);
     };
 }

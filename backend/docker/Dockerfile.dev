@@ -33,17 +33,17 @@ WORKDIR /app
 RUN git init
 
 # Add git submodules
-RUN git submodule add https://github.com/ggml-org/whisper.cpp.git ./libraries/whisper.cpp
+RUN git submodule add https://github.com/deepkhurana1999/whisper.cpp.git ./libraries/whisper.cpp
 RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./libraries/libdatachannel
 RUN git submodule update --init --recursive
 
 # Checkout specific versions
 RUN cd libraries/libdatachannel && git checkout v0.23.2
-RUN cd libraries/whisper.cpp && git checkout v1.8.0
+RUN cd libraries/whisper.cpp && git checkout v1.8.0_parallel
 
 # Create models directory and download whisper model
 RUN mkdir /models
-RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh tiny /models
+RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh base /models
 
 # Download Silero VAD model for Voice Activity Detection
 RUN mkdir -p /models/vad && \

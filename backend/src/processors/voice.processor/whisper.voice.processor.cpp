@@ -1,6 +1,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <thread>
+#include <whisper.h>
 #include "processors/voice.processor/voice.processor.hpp"
 #include "processors/voice.processor/whisper.voice.processor.hpp"
 
@@ -24,23 +26,39 @@ namespace lekhanai
         }
     }
 
-    std::string WhisperVoiceProcessor::process(const std::vector<float> &pcmData)
+    std::string WhisperVoiceProcessor::process(const std::vector<std::vector<float>> &batched_audio)
     {
         std::lock_guard<std::mutex> lock(threadMutex);
+        if (batched_audio.empty())
+        {
+            return "[BLANK_AUDIO]";
+        }
+        else if (batched_audio.size() > n_processors)
+        {
+            throw std::invalid_argument("The size of batched_audio must be equal to n_processors");
+        }
 
         auto params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
         params.language = "en";
         params.n_threads = n_threads;
         params.print_timestamps = false;
 
-        if (whisper_full_parallel(whisperCtx, params, pcmData.data(), pcmData.size(), n_processors) != 0)
+        std::vector<int> size_per_batch;
+        std::vector<const float *> batch_ptrs;
+        for (auto &batch : batched_audio)
         {
-            return ""; // Transcription failed
+            batch_ptrs.push_back(batch.data());
+            size_per_batch.push_back(batch.size());
         }
 
-        std::string result;
-        int nSegments = whisper_full_n_segments(whisperCtx);
-        for (int i = 0; i < nSegments; ++i)
+        if (whisper_full_batch_parallel(whisperCtx, params, batch_ptrs.data(), size_per_batch.data(), batched_audio.size(), n_processors) != 0)
+        {
+            return "[BLANK_AUDIO]"; // Transcription failed
+        }
+
+        std::string result = "";
+        int n_segments = whisper_full_n_segments(whisperCtx);
+        for (int i = 0; i < n_segments; ++i)
         {
             result += whisper_full_get_segment_text(whisperCtx, i);
         }
