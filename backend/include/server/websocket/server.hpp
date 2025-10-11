@@ -9,8 +9,8 @@ namespace lekhanai
     {
     private:
         typedef websocketpp::server<websocketpp::config::asio> server;
-        server wsServer;
-        Processor *requestProcessor;
+        server ws_server;
+        Processor *request_processor;
 
     public:
         WebSocketServer();

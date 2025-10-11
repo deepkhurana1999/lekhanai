@@ -13,7 +13,7 @@ namespace lekhanai
         explicit WhisperVoiceProcessor(const std::string &model_path, int n_threads, int n_processors);
         ~WhisperVoiceProcessor();
 
-        std::string process(const std::vector<float> &pcmData) override;
+        std::string process(const std::vector<std::vector<float>> &batched_audio) override;
 
     private:
         whisper_context *whisperCtx;

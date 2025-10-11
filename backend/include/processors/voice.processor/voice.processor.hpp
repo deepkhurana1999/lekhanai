@@ -9,7 +9,7 @@ namespace lekhanai
     {
     public:
         explicit VoiceProcessor(const std::string &model_path, int n_threads, int n_processors);
-        virtual std::string process(const std::vector<float> &pcmData) = 0;
+        virtual std::string process(const std::vector<std::vector<float>> &batched_audio) = 0;
 
     protected:
         std::mutex threadMutex; // Guard for thread safety if needed
