@@ -219,7 +219,7 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 const arrayBuffer = e.target.result;
-                const chunkSize = arrayBuffer.length; // 64KB chunks
+                const chunkSize = arrayBuffer.byteLength; // 64KB chunks
                 let offset = 0;
 
                 function sendNextChunk() {
