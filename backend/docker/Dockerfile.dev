@@ -35,11 +35,13 @@ RUN git init
 # Add git submodules
 RUN git submodule add https://github.com/deepkhurana1999/whisper.cpp.git ./libraries/whisper.cpp
 RUN git submodule add https://github.com/paullouisageneau/libdatachannel.git ./libraries/libdatachannel
+RUN git submodule add https://github.com/jmont-dev/ollama-hpp.git ./libraries/ollama-hpp
 RUN git submodule update --init --recursive
 
 # Checkout specific versions
 RUN cd libraries/libdatachannel && git checkout v0.23.2
 RUN cd libraries/whisper.cpp && git checkout v1.8.0_parallel
+RUN cd libraries/ollama-hpp && git checkout v0.9.7
 
 # Create models directory and download whisper model
 RUN mkdir /models
@@ -49,6 +51,15 @@ RUN /app/libraries/whisper.cpp/models/download-ggml-model.sh base /models
 RUN mkdir -p /models/vad && \
     wget -O /models/vad/silero_vad.onnx \
     https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx
+
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Download Qwen model for LLM summarization
+RUN ollama pull qwen3:1.7b
+
+# Run Ollama server in the background
+RUN ollama server &
 
 # Copy application files
 COPY ./backend/include /app/include

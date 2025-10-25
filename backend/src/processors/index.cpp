@@ -3,6 +3,7 @@
 #include "processors/index.hpp"
 #include "factories/vad.processor.factory.hpp"
 #include "factories/voice.processor.factory.hpp"
+#include "factories/summary.processor.factory.hpp"
 #include "processors/audio.processor/audio.processor.hpp"
 #include "processors/audio.processor/vad.audio.processor.hpp"
 
@@ -32,7 +33,13 @@ namespace lekhanai
         const int n_processors = 4;
 
         audio_processor = new AudioProcessor();
-        voice_processor = VoiceProcessorFactory().create(config.model_path, STT_MODEL::WHISPER, n_threads, n_processors);
+
+        voice_processor = VoiceProcessorFactory().create(
+            config.model_path,
+            STT_MODEL::WHISPER,
+            n_threads,
+            n_processors);
+
         vad_processor = VADProcessorFactory().create(
             config.vad_model_path,
             VAD_MODEL::SILERO,
@@ -52,11 +59,21 @@ namespace lekhanai
             max_speech_samples,
             speech_pad_samples,
             voice_activation_threshold);
+
+        summary_processor = SummaryProcessorFactory().create(
+            config.llm_model,
+            config.llm_server_url,
+            config.llm_model_provider);
     }
 
     std::vector<float> Processor::getDecodedAudio(const std::string &raw_audio)
     {
         return audio_processor->process(raw_audio);
+    }
+
+    std::string Processor::getSummary(const std::string &transcription)
+    {
+        return summary_processor->process(transcription);
     }
 
     std::string Processor::getVoiceTranscription(const std::vector<std::vector<float>> &audio)
@@ -71,13 +88,13 @@ namespace lekhanai
 
     std::vector<std::string> Processor::process(const std::string &raw_audio)
     {
-        std::vector<std::string> result;
+        std::vector<std::string> transcriptions;
         std::vector<float> audio_data = getDecodedAudio(raw_audio);
         auto speech_segments = getSpeechSegments(audio_data);
         if (speech_segments.empty())
         {
-            result.push_back("[BLANK_AUDIO]");
-            return result;
+            transcriptions.push_back("[BLANK_AUDIO]");
+            return transcriptions;
         }
 
         int n_processors = 4;
@@ -99,12 +116,15 @@ namespace lekhanai
             batched_audio[batch_number].push_back(segmented_audio);
         }
 
+        std::string complete_transcription = "";
         for (const auto &batch : batched_audio)
         {
             std::string transcription = getVoiceTranscription(batch);
-            result.push_back(transcription);
+            transcriptions.push_back(transcription);
+            complete_transcription += transcription + " ";
         }
 
+        std::vector<std::string> result = {getSummary(complete_transcription)};
         return result;
     }
 

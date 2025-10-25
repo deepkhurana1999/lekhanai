@@ -19,6 +19,9 @@ namespace lekhanai
         config.server_port = std::stoi(get("SERVER_PORT"));
         config.model_path = get("MODEL_PATH");
         config.vad_model_path = get("VAD_MODEL_PATH");
+        config.llm_model = get("LLM_MODEL");
+        config.llm_server_url = get("LLM_SERVER_URL");
+        config.llm_model_provider = get("LLM_MODEL_PROVIDER");
         return config;
     }
 
