@@ -33,7 +33,7 @@ make
 
 ### Starting Frontend
 
-Refer to `frontend/start.sh` for frontend startup instructions.
+Refer to `frontend/index.html` to run simplified frontend.
 
 ## Contributing
 See [Contributing.md](Contributing.md) for guidelines.
