@@ -12,7 +12,7 @@ namespace lekhanai
         virtual std::string process(const std::vector<std::vector<float>> &batched_audio) = 0;
 
     protected:
-        std::mutex threadMutex; // Guard for thread safety if needed
+        std::mutex thread_mutex; // Guard for thread safety if needed
         std::string model_path;
         int n_threads;
         int n_processors;
