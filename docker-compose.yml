@@ -1,6 +1,7 @@
 services:
   ollama:
     image: ollama/ollama
+    container_name: lekhanai-ollama
     ports:
       - "11434:11434"
     networks:
