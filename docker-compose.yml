@@ -1,4 +1,11 @@
 services:
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - lekhanai-network
+
   backend:
     build:
       context: .
