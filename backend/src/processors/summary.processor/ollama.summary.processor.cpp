@@ -1,5 +1,6 @@
 #include <string>
 #include <iostream>
+#include <exception>
 #include "ollama.hpp"
 #include "processors/summary.processor/summary.processor.hpp"
 #include "processors/summary.processor/ollama.summary.processor.hpp"
@@ -9,6 +10,7 @@ namespace lekhanai
     OllamaSummaryProcessor::OllamaSummaryProcessor(std::string &model, std::string &server_url) : SummaryProcessor(model), server_url(server_url)
     {
         ollama_server = new Ollama(server_url);
+        ollama_server->setConnectionTimeout(60 * 10); // 10 minutes
     }
 
     OllamaSummaryProcessor::~OllamaSummaryProcessor()
@@ -27,7 +29,7 @@ namespace lekhanai
         catch (const std::exception &e)
         {
             // Log the error message if needed
-            std::cerr << "Error occurred while processing transcription: " << e.what() << std::endl;
+            std::cout << "Error occurred while processing transcription: " << e.what() << std::endl;
             return "[SUMMARY_ERROR]";
         }
     }
