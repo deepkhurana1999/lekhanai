@@ -2,7 +2,7 @@
 #include <nlohmann/json.hpp>
 #include "constants.hpp"
 #include "config/index.hpp"
-#include "processors/index.hpp"
+#include "processors/request.processor.hpp"
 #include "factories/vad.processor.factory.hpp"
 #include "factories/voice.processor.factory.hpp"
 #include "factories/summary.processor.factory.hpp"
@@ -13,7 +13,7 @@ using json = nlohmann::json;
 
 namespace lekhanai
 {
-    Processor::Processor()
+    RequestProcessor::RequestProcessor()
     {
         Config config = Environment::getConfig();
         const int sample_rate = 16000; // Fixed sample rate for VAD and AudioProcessor
@@ -70,7 +70,7 @@ namespace lekhanai
             config.llm_model_provider);
     }
 
-    json Processor::process(REQUEST_MESSAGE_TYPE request_message_type, const std::string &payload)
+    json RequestProcessor::process(REQUEST_MESSAGE_TYPE request_message_type, const std::string &payload)
     {
         try
         {
@@ -121,27 +121,27 @@ namespace lekhanai
         }
     }
 
-    std::vector<float> Processor::getDecodedAudio(const std::string &raw_audio)
+    std::vector<float> RequestProcessor::getDecodedAudio(const std::string &raw_audio)
     {
         return audio_processor->process(raw_audio);
     }
 
-    std::string Processor::getSummary(const std::string &transcription)
+    std::string RequestProcessor::getSummary(const std::string &transcription)
     {
         return summary_processor->process(transcription);
     }
 
-    std::string Processor::getVoiceTranscription(const std::vector<std::vector<float>> &audio)
+    std::string RequestProcessor::getVoiceTranscription(const std::vector<std::vector<float>> &audio)
     {
         return voice_processor->process(audio);
     }
 
-    std::vector<SpeechSegment> Processor::getSpeechSegments(const std::vector<float> &audio)
+    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::vector<float> &audio)
     {
         return vad_audio_processor->process(audio);
     }
 
-    std::vector<std::string> Processor::getVoiceTranscriptions(const std::string &raw_audio)
+    std::vector<std::string> RequestProcessor::getVoiceTranscriptions(const std::string &raw_audio)
     {
         std::vector<std::string> transcriptions;
         std::vector<float> audio_data = getDecodedAudio(raw_audio);
@@ -185,7 +185,7 @@ namespace lekhanai
         return transcriptions;
     }
 
-    Processor::~Processor()
+    RequestProcessor::~RequestProcessor()
     {
         delete audio_processor;
         delete voice_processor;

@@ -5,8 +5,8 @@
 #include <websocketpp/server.hpp>
 #include <websocketpp/config/asio_no_tls.hpp>
 #include "constants.hpp"
-#include "processors/index.hpp"
 #include "server/websocket/server.hpp"
+#include "processors/request.processor.hpp"
 
 using json = nlohmann::json;
 namespace lekhanai
@@ -38,7 +38,7 @@ namespace lekhanai
         ws_server.run();
     }
 
-    void WebSocketServer::setRequestProcessor(Processor *processor)
+    void WebSocketServer::setRequestProcessor(RequestProcessor *processor)
     {
         request_processor = processor;
     }

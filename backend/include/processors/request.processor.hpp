@@ -12,12 +12,12 @@
 using json = nlohmann::json;
 namespace lekhanai
 {
-    class Processor
+    class RequestProcessor
     {
     public:
-        Processor();
+        RequestProcessor();
         json process(REQUEST_MESSAGE_TYPE request_message_type, const std::string &payload);
-        ~Processor();
+        ~RequestProcessor();
 
     private:
         AudioProcessor *audio_processor;
