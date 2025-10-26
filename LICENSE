@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 Deep khurana
+Copyright (c) 2025 Deep Khurana
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+#### Third-Party and Transitive dependencies, Software, and AI/ML Model Disclaimer
+
+This project may incorporate third-party libraries, software, and AI/ML models, either as direct dependencies or as dependencies of those dependencies (“transitive dependencies”). Each such component retains its own license and copyright.
+
+No guarantee or warranty is provided for the behavior, safety, accuracy, or fitness for purpose of any third-party or transitive dependencies. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability, whether in contract, tort, or otherwise, arising from, out of, or in connection with the use of these components. Users are solely responsible for reviewing, complying with, and attributing all relevant third-party licenses and terms. For a complete list and license information of direct dependencies, see the README.
+
+If you modify this project and add further dependencies, update the README accordingly before redistributing.
