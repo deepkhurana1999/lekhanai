@@ -1,6 +1,6 @@
 # lekhanai
 
-LekhanAI is a open-source transcriber, using whisper.cpp.
+LekhanAI is a open-source AI note taker.
 
 ## Project Structure
 
