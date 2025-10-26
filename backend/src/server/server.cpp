@@ -1,7 +1,7 @@
 #include "server/server.hpp"
-#include "processors/index.hpp"
 #include "server/websocket/server.hpp"
 #include "server/webrtc/signal.server.hpp"
+#include "processors/request.processor.hpp"
 
 namespace lekhanai
 {
@@ -16,7 +16,7 @@ namespace lekhanai
         if (type == ServerType::WebSocket)
         {
             WebSocketServer wsServer;
-            Processor *processor = new Processor();
+            RequestProcessor *processor = new RequestProcessor();
             wsServer.setRequestProcessor(processor);
             wsServer.run(port);
         }

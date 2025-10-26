@@ -1,7 +1,7 @@
 #pragma once
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
-#include "processors/index.hpp"
+#include "processors/request.processor.hpp"
 
 namespace lekhanai
 {
@@ -10,13 +10,13 @@ namespace lekhanai
     private:
         typedef websocketpp::server<websocketpp::config::asio> server;
         server ws_server;
-        Processor *request_processor;
+        RequestProcessor *request_processor;
 
     public:
         WebSocketServer();
 
         void run(int port);
-        void setRequestProcessor(Processor *processor);
+        void setRequestProcessor(RequestProcessor *processor);
 
     private:
         void handleWebSocketMessage(websocketpp::connection_hdl hdl, server::message_ptr msg);

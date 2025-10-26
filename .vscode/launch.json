@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/app/build/lekhanai-backend",
-            "stopAtEntry": false,
+            "stopAtEntry": true,
             "cwd": "/app",
             "args": [],
             "pipeTransport": {

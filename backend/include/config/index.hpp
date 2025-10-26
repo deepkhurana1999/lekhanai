@@ -9,6 +9,9 @@ namespace lekhanai
         int server_port;
         std::string model_path;
         std::string vad_model_path;
+        std::string llm_model;
+        std::string llm_server_url;
+        std::string llm_model_provider;
     };
 
     class Environment

@@ -10,8 +10,8 @@ namespace lekhanai
 {
     WhisperVoiceProcessor::WhisperVoiceProcessor(const std::string &model_path, int n_threads, int n_processors) : VoiceProcessor(model_path, n_threads, n_processors)
     {
-        whisperCtx = whisper_init_from_file(model_path.c_str());
-        if (!whisperCtx)
+        whisper_ctx = whisper_init_from_file(model_path.c_str());
+        if (!whisper_ctx)
         {
             throw std::runtime_error("Failed to load Whisper model at " + model_path);
         }
@@ -19,16 +19,16 @@ namespace lekhanai
 
     WhisperVoiceProcessor::~WhisperVoiceProcessor()
     {
-        if (whisperCtx)
+        if (whisper_ctx)
         {
-            whisper_free(whisperCtx);
-            whisperCtx = nullptr;
+            whisper_free(whisper_ctx);
+            whisper_ctx = nullptr;
         }
     }
 
     std::string WhisperVoiceProcessor::process(const std::vector<std::vector<float>> &batched_audio)
     {
-        std::lock_guard<std::mutex> lock(threadMutex);
+        std::lock_guard<std::mutex> lock(thread_mutex);
         if (batched_audio.empty())
         {
             return "[BLANK_AUDIO]";
@@ -51,16 +51,16 @@ namespace lekhanai
             size_per_batch.push_back(batch.size());
         }
 
-        if (whisper_full_batch_parallel(whisperCtx, params, batch_ptrs.data(), size_per_batch.data(), batched_audio.size(), n_processors) != 0)
+        if (whisper_full_batch_parallel(whisper_ctx, params, batch_ptrs.data(), size_per_batch.data(), batched_audio.size(), n_processors) != 0)
         {
             return "[BLANK_AUDIO]"; // Transcription failed
         }
 
         std::string result = "";
-        int n_segments = whisper_full_n_segments(whisperCtx);
+        int n_segments = whisper_full_n_segments(whisper_ctx);
         for (int i = 0; i < n_segments; ++i)
         {
-            result += whisper_full_get_segment_text(whisperCtx, i);
+            result += whisper_full_get_segment_text(whisper_ctx, i);
         }
         return result;
     }

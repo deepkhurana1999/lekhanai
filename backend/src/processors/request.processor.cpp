@@ -1,14 +1,19 @@
+#include <iostream>
+#include <nlohmann/json.hpp>
 #include "constants.hpp"
 #include "config/index.hpp"
-#include "processors/index.hpp"
+#include "processors/request.processor.hpp"
 #include "factories/vad.processor.factory.hpp"
 #include "factories/voice.processor.factory.hpp"
+#include "factories/summary.processor.factory.hpp"
 #include "processors/audio.processor/audio.processor.hpp"
 #include "processors/audio.processor/vad.audio.processor.hpp"
 
+using json = nlohmann::json;
+
 namespace lekhanai
 {
-    Processor::Processor()
+    RequestProcessor::RequestProcessor()
     {
         Config config = Environment::getConfig();
         const int sample_rate = 16000; // Fixed sample rate for VAD and AudioProcessor
@@ -32,7 +37,13 @@ namespace lekhanai
         const int n_processors = 4;
 
         audio_processor = new AudioProcessor();
-        voice_processor = VoiceProcessorFactory().create(config.model_path, STT_MODEL::WHISPER, n_threads, n_processors);
+
+        voice_processor = VoiceProcessorFactory().create(
+            config.model_path,
+            STT_MODEL::WHISPER,
+            n_threads,
+            n_processors);
+
         vad_processor = VADProcessorFactory().create(
             config.vad_model_path,
             VAD_MODEL::SILERO,
@@ -52,32 +63,93 @@ namespace lekhanai
             max_speech_samples,
             speech_pad_samples,
             voice_activation_threshold);
+
+        summary_processor = SummaryProcessorFactory().create(
+            config.llm_model,
+            config.llm_server_url,
+            config.llm_model_provider);
     }
 
-    std::vector<float> Processor::getDecodedAudio(const std::string &raw_audio)
+    json RequestProcessor::process(REQUEST_MESSAGE_TYPE request_message_type, const std::string &payload)
+    {
+        try
+        {
+            if (request_message_type == REQUEST_MESSAGE_TYPE::BINARY)
+            {
+                std::vector<std::string> transcriptions = getVoiceTranscriptions(payload);
+                std::string complete_transcription = "";
+                for (auto &transcription : transcriptions)
+                {
+                    complete_transcription += transcription + " ";
+                }
+                json response{
+                    {"type", "transcription"},
+                    {"text", complete_transcription}};
+                return response;
+            }
+            else if (request_message_type == REQUEST_MESSAGE_TYPE::TEXT)
+            {
+                auto received_json = json::parse(payload);
+                if (received_json["type"] == "generate_summary")
+                {
+                    std::string transcription_text = received_json["text"];
+                    std::string summary = getSummary(transcription_text);
+                    json response{
+                        {"type", "summary"},
+                        {"text", summary}};
+                    return response;
+                }
+            }
+            else
+            {
+                json response{
+                    {"type", "unknown"},
+                    {"text", "Unsupported message type"}};
+                return response;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Error handling message: " << e.what() << std::endl;
+            std::cerr << "Payload: " << payload << std::endl;
+
+            json response{
+                {"type", "unknown"},
+                {"text", "Failed to process the message"}};
+
+            return response;
+        }
+    }
+
+    std::vector<float> RequestProcessor::getDecodedAudio(const std::string &raw_audio)
     {
         return audio_processor->process(raw_audio);
     }
 
-    std::string Processor::getVoiceTranscription(const std::vector<std::vector<float>> &audio)
+    std::string RequestProcessor::getSummary(const std::string &transcription)
+    {
+        return summary_processor->process(transcription);
+    }
+
+    std::string RequestProcessor::getVoiceTranscription(const std::vector<std::vector<float>> &audio)
     {
         return voice_processor->process(audio);
     }
 
-    std::vector<SpeechSegment> Processor::getSpeechSegments(const std::vector<float> &audio)
+    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::vector<float> &audio)
     {
         return vad_audio_processor->process(audio);
     }
 
-    std::vector<std::string> Processor::process(const std::string &raw_audio)
+    std::vector<std::string> RequestProcessor::getVoiceTranscriptions(const std::string &raw_audio)
     {
-        std::vector<std::string> result;
+        std::vector<std::string> transcriptions;
         std::vector<float> audio_data = getDecodedAudio(raw_audio);
         auto speech_segments = getSpeechSegments(audio_data);
         if (speech_segments.empty())
         {
-            result.push_back("[BLANK_AUDIO]");
-            return result;
+            transcriptions.push_back("[BLANK_AUDIO]");
+            return transcriptions;
         }
 
         int n_processors = 4;
@@ -102,13 +174,18 @@ namespace lekhanai
         for (const auto &batch : batched_audio)
         {
             std::string transcription = getVoiceTranscription(batch);
-            result.push_back(transcription);
+            transcriptions.push_back(transcription);
         }
 
-        return result;
+        if (transcriptions.empty())
+        {
+            transcriptions.push_back("[BLANK_AUDIO]");
+        }
+
+        return transcriptions;
     }
 
-    Processor::~Processor()
+    RequestProcessor::~RequestProcessor()
     {
         delete audio_processor;
         delete voice_processor;

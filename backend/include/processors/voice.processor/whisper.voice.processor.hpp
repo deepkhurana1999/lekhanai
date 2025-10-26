@@ -16,6 +16,6 @@ namespace lekhanai
         std::string process(const std::vector<std::vector<float>> &batched_audio) override;
 
     private:
-        whisper_context *whisperCtx;
+        whisper_context *whisper_ctx;
     };
 }

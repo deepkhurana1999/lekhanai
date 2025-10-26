@@ -121,7 +121,7 @@
                     if (data.type === 'transcription') {
                         log(`[Transcript] ${data.text}`);
                     } else if (data.type === 'summary') {
-                        log(`[Summary] ${data.summary}`);
+                        log(`[Summary] ${data.text}`);
                     } else {
                         log(`[Server] ${JSON.stringify(data)}`);
                     }
@@ -219,7 +219,7 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 const arrayBuffer = e.target.result;
-                const chunkSize = 64 * 1024; // 64KB chunks
+                const chunkSize = arrayBuffer.byteLength; // 64KB chunks
                 let offset = 0;
 
                 function sendNextChunk() {
@@ -253,7 +253,17 @@
         // Actions
         summaryBtn.addEventListener('click', () => {
             if (ws.readyState === WebSocket.OPEN) {
-                const msg = JSON.stringify({ type: 'generate_summary' });
+                log('Requesting summary generation');
+                const texts = logDiv.textContent.split('\n');
+                const transcriptLines = texts.filter(line => line.includes('[Transcript]'));
+                const transcript = transcriptLines.map(line => line.split('] ')[2]).join(' ');
+
+                if (!transcript) {
+                    log('No transcript available to summarize');
+                    return;
+                }
+
+                const msg = JSON.stringify({ type: 'generate_summary', text: transcript });
                 ws.send(msg);
                 log('Requested summary generation');
             }

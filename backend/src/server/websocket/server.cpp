@@ -1,10 +1,12 @@
 #include <vector>
 #include <string>
+#include <iostream>
 #include <nlohmann/json.hpp>
 #include <websocketpp/server.hpp>
 #include <websocketpp/config/asio_no_tls.hpp>
-#include "processors/index.hpp"
+#include "constants.hpp"
 #include "server/websocket/server.hpp"
+#include "processors/request.processor.hpp"
 
 using json = nlohmann::json;
 namespace lekhanai
@@ -36,7 +38,7 @@ namespace lekhanai
         ws_server.run();
     }
 
-    void WebSocketServer::setRequestProcessor(Processor *processor)
+    void WebSocketServer::setRequestProcessor(RequestProcessor *processor)
     {
         request_processor = processor;
     }
@@ -47,19 +49,29 @@ namespace lekhanai
         {
             if (msg->get_opcode() == websocketpp::frame::opcode::binary)
             {
-                std::vector<std::string> transcriptions = request_processor->process(msg->get_payload());
-                for (auto &transcription : transcriptions)
-                {
-                    json response{
-                        {"type", "transcription"},
-                        {"text", transcription}};
-                    ws_server.send(hdl, response.dump(), websocketpp::frame::opcode::text);
-                }
+                json response = request_processor->process(REQUEST_MESSAGE_TYPE::BINARY, msg->get_payload());
+                ws_server.send(hdl, response.dump(), websocketpp::frame::opcode::text);
+            }
+            else if (msg->get_opcode() == websocketpp::frame::opcode::text)
+            {
+                json response = request_processor->process(REQUEST_MESSAGE_TYPE::TEXT, msg->get_payload());
+                ws_server.send(hdl, response.dump(), websocketpp::frame::opcode::text);
+            }
+            else
+            {
+                json response{
+                    {"type", "unknown"},
+                    {"text", "Unsupported message type"}};
+                ws_server.send(hdl, response.dump(), websocketpp::frame::opcode::text);
             }
         }
         catch (const std::exception &e)
         {
             std::cerr << "Error handling WebSocket message: " << e.what() << std::endl;
+            json response{
+                {"type", "unknown"},
+                {"text", "Failed to process the message"}};
+            ws_server.send(hdl, response.dump(), websocketpp::frame::opcode::text);
         }
     }
 }
