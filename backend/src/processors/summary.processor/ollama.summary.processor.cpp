@@ -11,6 +11,8 @@ namespace lekhanai
     {
         ollama_server = new Ollama(server_url);
         ollama_server->setConnectionTimeout(60 * 10); // 10 minutes
+        ollama_server->setWriteTimeout(60 * 10);      // 10 minutes
+        ollama_server->setReadTimeout(60 * 10);       // 10 minutes
     }
 
     OllamaSummaryProcessor::~OllamaSummaryProcessor()
