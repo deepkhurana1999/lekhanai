@@ -21,7 +21,8 @@ namespace lekhanai
         try
         {
             std::string command = "Analyse the text, identify the domain, get appropriate information regarding the domain, analyse the context, generate the summary using analyzed text, identified domain, identified domain knowledge, identified context for text: " + transcription;
-            return ollama_server->generate(model, command).as_simple_string();
+            auto response = ollama_server->generate(model, command);
+            return response.as_simple_string();
         }
         catch (const std::exception &e)
         {
