@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 #include "ollama.hpp"
 #include "processors/summary.processor/summary.processor.hpp"
 #include "processors/summary.processor/ollama.summary.processor.hpp"

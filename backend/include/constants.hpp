@@ -11,4 +11,10 @@ namespace lekhanai
     {
         SILERO
     };
+
+    enum REQUEST_MESSAGE_TYPE
+    {
+        BINARY,
+        TEXT
+    };
 }

@@ -1,3 +1,5 @@
+#include <iostream>
+#include <nlohmann/json.hpp>
 #include "constants.hpp"
 #include "config/index.hpp"
 #include "processors/index.hpp"
@@ -6,6 +8,8 @@
 #include "factories/summary.processor.factory.hpp"
 #include "processors/audio.processor/audio.processor.hpp"
 #include "processors/audio.processor/vad.audio.processor.hpp"
+
+using json = nlohmann::json;
 
 namespace lekhanai
 {
@@ -66,6 +70,57 @@ namespace lekhanai
             config.llm_model_provider);
     }
 
+    json Processor::process(REQUEST_MESSAGE_TYPE request_message_type, const std::string &payload)
+    {
+        try
+        {
+            if (request_message_type == REQUEST_MESSAGE_TYPE::BINARY)
+            {
+                std::vector<std::string> transcriptions = getVoiceTranscriptions(payload);
+                std::string complete_transcription = "";
+                for (auto &transcription : transcriptions)
+                {
+                    complete_transcription += transcription + " ";
+                }
+                json response{
+                    {"type", "transcription"},
+                    {"text", complete_transcription}};
+                return response;
+            }
+            else if (request_message_type == REQUEST_MESSAGE_TYPE::TEXT)
+            {
+                auto received_json = json::parse(payload);
+                if (received_json["type"] == "generate_summary")
+                {
+                    std::string transcription_text = received_json["text"];
+                    std::string summary = getSummary(transcription_text);
+                    json response{
+                        {"type", "summary"},
+                        {"text", summary}};
+                    return response;
+                }
+            }
+            else
+            {
+                json response{
+                    {"type", "unknown"},
+                    {"text", "Unsupported message type"}};
+                return response;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Error handling message: " << e.what() << std::endl;
+            std::cerr << "Payload: " << payload << std::endl;
+
+            json response{
+                {"type", "unknown"},
+                {"text", "Failed to process the message"}};
+
+            return response;
+        }
+    }
+
     std::vector<float> Processor::getDecodedAudio(const std::string &raw_audio)
     {
         return audio_processor->process(raw_audio);
@@ -86,7 +141,7 @@ namespace lekhanai
         return vad_audio_processor->process(audio);
     }
 
-    std::vector<std::string> Processor::process(const std::string &raw_audio)
+    std::vector<std::string> Processor::getVoiceTranscriptions(const std::string &raw_audio)
     {
         std::vector<std::string> transcriptions;
         std::vector<float> audio_data = getDecodedAudio(raw_audio);
@@ -116,16 +171,18 @@ namespace lekhanai
             batched_audio[batch_number].push_back(segmented_audio);
         }
 
-        std::string complete_transcription = "";
         for (const auto &batch : batched_audio)
         {
             std::string transcription = getVoiceTranscription(batch);
             transcriptions.push_back(transcription);
-            complete_transcription += transcription + " ";
         }
 
-        std::vector<std::string> result = {getSummary(complete_transcription)};
-        return result;
+        if (transcriptions.empty())
+        {
+            transcriptions.push_back("[BLANK_AUDIO]");
+        }
+
+        return transcriptions;
     }
 
     Processor::~Processor()
