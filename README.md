@@ -56,7 +56,7 @@ See [LICENSE](LICENSE) for details.
 ### silero-vad
 - **Purpose**: Voice Activity Detection (VAD)
 - **Integration**: Silero VAD ONNX model downloaded at build time (`/models/vad/silero_vad.onnx`)
-- **License**: [Apache 2.0](https://github.com/snakers4/silero-vad/blob/master/LICENSE)
+- **License**: [MIT](https://github.com/snakers4/silero-vad/blob/master/LICENSE)
 
 ### Ollama provider (ollama-hpp)
 - **Purpose**: Transcript summarization
@@ -68,12 +68,12 @@ See [LICENSE](LICENSE) for details.
 - **Purpose**: WebRTC data channel library
 - **Integration**: Added as a git submodule (`libraries/libdatachannel`), built via CMake
 - **Version**: v0.23.2
-- **License**: [MIT](https://github.com/paullouisageneau/libdatachannel/blob/master/LICENSE)
+- **License**: [Mozilla Public License 2.0](https://github.com/paullouisageneau/libdatachannel/blob/master/LICENSE)
 
 ### cpprestsdk
 - **Purpose**: REST API client/server
 - **Integration**: Installed via system package (`libcpprest-dev`), linked in backend
-- **License**: [MIT](https://github.com/microsoft/cpprestsdk/blob/master/LICENSE)
+- **License**: [MIT](https://github.com/microsoft/cpprestsdk/blob/master/license.txt)
 
 ### nlohmann_json
 - **Purpose**: JSON for Modern C++
