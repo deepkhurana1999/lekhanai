@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
+const COMMANDS = {
+  GET_INPUT_DEVICES: "get_input_devices"
+};
+
 const AppState = {
   IDLE: "idle",
   RECORDING: "recording",
@@ -77,14 +81,13 @@ function App() {
 
   async function loadMicrophones() {
     try {
-      const devices = await invoke("get_input_devices");
+      const devices = await invoke(COMMANDS.GET_INPUT_DEVICES);
       setMicrophones(devices || []);
       // Auto-select first mic if available
       if (devices && devices.length > 0 && !selectedMicrophone) {
         setSelectedMicrophone(devices[0].name);
       }
     } catch (error) {
-      console.error("Failed to load microphones:", error);
       setMicrophones([]);
     }
   }
