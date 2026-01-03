@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
+const AppState = {
+  IDLE: "idle",
+  RECORDING: "recording",
+  VIEWING: "viewing"
+}
+
 // Mock historical sessions
 const MOCK_SESSIONS = [
   {
@@ -32,7 +38,7 @@ const MOCK_SESSIONS = [
 
 function App() {
   // Core state
-  const [appState, setAppState] = useState("idle"); // 'idle', 'recording', 'viewing'
+  const [appState, setAppState] = useState(AppState.IDLE); // 'idle', 'recording', 'viewing'
   const [microphones, setMicrophones] = useState([]);
   const [selectedMicrophone, setSelectedMicrophone] = useState(null);
   const [showMicModal, setShowMicModal] = useState(false);
@@ -54,12 +60,12 @@ function App() {
 
   // Timer effect
   useEffect(() => {
-    if (appState === "recording" && !timerInterval) {
+    if (appState === AppState.RECORDING && !timerInterval) {
       const interval = setInterval(() => {
         setElapsedTime(prev => prev + 1);
       }, 1000);
       setTimerInterval(interval);
-    } else if (appState !== "recording" && timerInterval) {
+    } else if (appState !== AppState.RECORDING && timerInterval) {
       clearInterval(timerInterval);
       setTimerInterval(null);
     }
@@ -90,7 +96,7 @@ function App() {
 
   function startRecording() {
     setShowMicModal(false);
-    setAppState("recording");
+    setAppState(AppState.RECORDING);
     setCurrentTranscript("");
     setElapsedTime(0);
     setSelectedSession(null);
@@ -108,7 +114,7 @@ function App() {
   }
 
   function handleStopRecording() {
-    setAppState("idle");
+    setAppState(AppState.IDLE);
 
     // Save session
     if (currentTranscript) {
@@ -129,12 +135,12 @@ function App() {
 
   function handleViewSession(session) {
     setSelectedSession(session);
-    setAppState("viewing");
+    setAppState(AppState.VIEWING);
     setShowLibrary(false);
   }
 
   function handleNewRecording() {
-    setAppState("idle");
+    setAppState(AppState.IDLE);
     setSelectedSession(null);
     setCurrentTranscript("");
   }
@@ -189,12 +195,12 @@ function App() {
   // Determine what to display
   let displayContent, primaryActionText, primaryActionHandler, showSecondaryAction;
 
-  if (appState === "idle") {
+  if (appState === AppState.IDLE) {
     displayContent = <div className="empty-state">Start your first transcription</div>;
     primaryActionText = "Record";
     primaryActionHandler = handleRecordClick;
     showSecondaryAction = true;
-  } else if (appState === "recording") {
+  } else if (appState === AppState.RECORDING) {
     displayContent = (
       <div className="transcription-text">
         {currentTranscript || "Listening..."}
@@ -203,7 +209,7 @@ function App() {
     primaryActionText = "Stop";
     primaryActionHandler = handleStopRecording;
     showSecondaryAction = false;
-  } else if (appState === "viewing" && selectedSession) {
+  } else if (appState === AppState.VIEWING && selectedSession) {
     const sessionDate = selectedSession.timestamp.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -238,8 +244,8 @@ function App() {
           </button>
         </div>
         <div className="header-right">
-          {appState === "recording" && <span className="timer">{formatTime(elapsedTime)}</span>}
-          <div className={`status-dot ${appState === "recording" ? "recording" : ""}`}></div>
+          {appState === AppState.RECORDING && <span className="timer">{formatTime(elapsedTime)}</span>}
+          <div className={`status-dot ${appState === AppState.RECORDING ? AppState.RECORDING : ""}`}></div>
         </div>
       </header>
 
@@ -253,7 +259,7 @@ function App() {
       {/* Primary Action */}
       <div className="primary-action">
         <button
-          className={`btn-primary ${appState === "recording" ? "recording" : ""}`}
+          className={`btn-primary ${appState === AppState.RECORDING ? AppState.RECORDING : ""}`}
           onClick={primaryActionHandler}
         >
           {primaryActionText}
@@ -359,13 +365,13 @@ function App() {
                 className="btn-primary"
                 onClick={() => {
                   setShowMicModal(false);
-                  if (appState === "idle") {
+                  if (appState === AppState.IDLE) {
                     startRecording();
                   }
                 }}
                 style={{ flex: 1, minWidth: 'auto' }}
               >
-                {appState === "idle" ? "Start Recording" : "Done"}
+                {appState === AppState.IDLE ? "Start Recording" : "Done"}
               </button>
               <button
                 className="secondary-link"
