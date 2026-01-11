@@ -17,6 +17,8 @@ namespace lekhanai
     public:
         RequestProcessor();
         json process(REQUEST_MESSAGE_TYPE request_message_type, const std::string &payload);
+        std::vector<SpeechSegment> getSpeechSegments(const std::string &raw_audio);
+        std::vector<std::string> getVoiceTranscriptions(const std::vector<SpeechSegment> speech_segments, const std::string &raw_audio);
         ~RequestProcessor();
 
     private:
@@ -28,8 +30,5 @@ namespace lekhanai
 
         std::string getSummary(const std::string &transcription);
         std::vector<float> getDecodedAudio(const std::string &raw_audio);
-        std::string getVoiceTranscription(const std::vector<std::vector<float>> &audio);
-        std::vector<SpeechSegment> getSpeechSegments(const std::vector<float> &audio);
-        std::vector<std::string> getVoiceTranscriptions(const std::string &raw_audio);
     };
 }

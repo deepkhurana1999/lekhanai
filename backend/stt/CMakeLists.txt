@@ -46,6 +46,8 @@ if(NOT WEBSOCKETPP_INCLUDE_DIR)
 message(FATAL_ERROR "Could not find WebSocket++ headers. Please install websocket++ package.")
 endif()
 
+find_package(Boost REQUIRED COMPONENTS system thread)
+find_package(Threads REQUIRED)
 add_executable(stt ${SOURCES})
 add_subdirectory(libraries/libdatachannel)
 add_subdirectory(libraries/whisper.cpp)
@@ -56,6 +58,7 @@ target_link_libraries(stt PRIVATE datachannel)
 target_link_libraries(stt PRIVATE cpprestsdk::cpprest)
 target_link_libraries(stt PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(stt PRIVATE onnxruntime::onnxruntime)
+target_link_libraries(stt PRIVATE Boost::system Boost::thread)
 
 # Include directories
 target_include_directories(stt PRIVATE ${WEBSOCKETPP_INCLUDE_DIR})

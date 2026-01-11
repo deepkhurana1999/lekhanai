@@ -131,21 +131,16 @@ namespace lekhanai
         return summary_processor->process(transcription);
     }
 
-    std::string RequestProcessor::getVoiceTranscription(const std::vector<std::vector<float>> &audio)
+    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::string &raw_audio)
     {
-        return voice_processor->process(audio);
+        std::vector<float> audio_data = getDecodedAudio(raw_audio);
+        return vad_audio_processor->process(audio_data);
     }
 
-    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::vector<float> &audio)
-    {
-        return vad_audio_processor->process(audio);
-    }
-
-    std::vector<std::string> RequestProcessor::getVoiceTranscriptions(const std::string &raw_audio)
+    std::vector<std::string> RequestProcessor::getVoiceTranscriptions(const std::vector<SpeechSegment> speech_segments, const std::string &raw_audio)
     {
         std::vector<std::string> transcriptions;
         std::vector<float> audio_data = getDecodedAudio(raw_audio);
-        auto speech_segments = getSpeechSegments(audio_data);
         if (speech_segments.empty())
         {
             transcriptions.push_back("[BLANK_AUDIO]");
@@ -173,7 +168,7 @@ namespace lekhanai
 
         for (const auto &batch : batched_audio)
         {
-            std::string transcription = getVoiceTranscription(batch);
+            std::string transcription = voice_processor->process(batch);
             transcriptions.push_back(transcription);
         }
 

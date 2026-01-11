@@ -8,11 +8,6 @@ namespace lekhanai
 
     void Server::run(int port, ServerType type)
     {
-        if (type != ServerType::WebRTCSignaling && type != ServerType::WebSocket)
-        {
-            throw std::invalid_argument("Invalid server type");
-        }
-
         if (type == ServerType::WebSocket)
         {
             WebSocketServer wsServer;
@@ -24,6 +19,18 @@ namespace lekhanai
         {
             WebRTCSignalingServer webrtcServer;
             webrtcServer.run(port);
+        }
+        else if (type == ServerType::Http)
+        {
+            boost::asio::io_context ioc;
+            RequestProcessor *processor = new RequestProcessor();
+            HttpServer http_server(ioc, port, processor);
+            std::cout << "HTTP Server running on port " << port << std::endl;
+            ioc.run();
+        }
+        else
+        {
+            throw std::invalid_argument("Invalid server type");
         }
     }
 }

@@ -4,7 +4,8 @@ namespace lekhanai
     enum class ServerType
     {
         WebSocket,
-        WebRTCSignaling
+        WebRTCSignaling,
+        Http
     };
 
     class Server

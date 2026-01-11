@@ -19,5 +19,24 @@ services:
     command: sh -c "cd /app && ./build/stt"
     networks:
       - lekhanai-network
+  manager:
+    build:
+      context: ./backend/manager
+      dockerfile: Dockerfile
+    container_name: lekhanai-manager
+    ports:
+      - "5000:5000"
+    networks:
+      - lekhanai-network
+
+  analyser:
+    build:
+      context: ./backend/analyser
+      dockerfile: Dockerfile
+    container_name: lekhanai-analyser
+    ports:
+      - "8004:8004"
+    networks:
+      - lekhanai-network
 networks:
   lekhanai-network:
