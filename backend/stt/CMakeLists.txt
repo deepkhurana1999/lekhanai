@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28.3)
-project(lekhanai-backend)
+project(stt)
 set(CMAKE_CXX_STANDARD 23)
 
 file(GLOB SOURCES src/*.cpp src/**/*.cpp src/**/**/*.cpp)
@@ -46,20 +46,20 @@ if(NOT WEBSOCKETPP_INCLUDE_DIR)
 message(FATAL_ERROR "Could not find WebSocket++ headers. Please install websocket++ package.")
 endif()
 
-add_executable(lekhanai-backend ${SOURCES})
+add_executable(stt ${SOURCES})
 add_subdirectory(libraries/libdatachannel)
 add_subdirectory(libraries/whisper.cpp)
 
 # Link libraries
-target_link_libraries(lekhanai-backend PRIVATE whisper)
-target_link_libraries(lekhanai-backend PRIVATE datachannel)
-target_link_libraries(lekhanai-backend PRIVATE cpprestsdk::cpprest)
-target_link_libraries(lekhanai-backend PRIVATE nlohmann_json::nlohmann_json)
-target_link_libraries(lekhanai-backend PRIVATE onnxruntime::onnxruntime)
+target_link_libraries(stt PRIVATE whisper)
+target_link_libraries(stt PRIVATE datachannel)
+target_link_libraries(stt PRIVATE cpprestsdk::cpprest)
+target_link_libraries(stt PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(stt PRIVATE onnxruntime::onnxruntime)
 
 # Include directories
-target_include_directories(lekhanai-backend PRIVATE ${WEBSOCKETPP_INCLUDE_DIR})
-target_include_directories(lekhanai-backend PRIVATE include/)
-target_include_directories(lekhanai-backend PRIVATE libraries/whisper.cpp/include)
-target_include_directories(lekhanai-backend PRIVATE libraries/libdatachannel/include)
-target_include_directories(lekhanai-backend PRIVATE libraries/ollama-hpp/include)
+target_include_directories(stt PRIVATE ${WEBSOCKETPP_INCLUDE_DIR})
+target_include_directories(stt PRIVATE include/)
+target_include_directories(stt PRIVATE libraries/whisper.cpp/include)
+target_include_directories(stt PRIVATE libraries/libdatachannel/include)
+target_include_directories(stt PRIVATE libraries/ollama-hpp/include)

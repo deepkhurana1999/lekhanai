@@ -53,9 +53,9 @@ RUN mkdir -p /models/vad && \
     https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx
 
 # Copy application files
-COPY ./backend/include /app/include
-COPY ./backend/src /app/src
-COPY ./backend/CMakeLists.txt /app/CMakeLists.txt
-COPY ./backend/entrypoint.sh /app/entrypoint.sh
+COPY ./backend/stt/include /app/include
+COPY ./backend/stt/src /app/src
+COPY ./backend/stt/CMakeLists.txt /app/CMakeLists.txt
+COPY ./backend/stt/entrypoint.sh /app/entrypoint.sh
 
 ENTRYPOINT [ "bash", "/app/entrypoint.sh" ]

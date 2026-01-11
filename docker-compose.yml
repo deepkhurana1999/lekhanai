@@ -7,16 +7,16 @@ services:
     networks:
       - lekhanai-network
 
-  backend:
+  stt:
     build:
       context: .
-      dockerfile: ./backend/docker/Dockerfile.dev
-    container_name: lekhanai-backend
+      dockerfile: ./backend/stt/docker/Dockerfile.dev
+    container_name: lekhanai-stt
     env_file:
-      - ./backend/template.env
+      - ./backend/stt/template.env
     ports:
       - "8080:8080"
-    command: sh -c "cd /app && ./build/lekhanai-backend"
+    command: sh -c "cd /app && ./build/stt"
     networks:
       - lekhanai-network
 networks:
