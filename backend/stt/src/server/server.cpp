@@ -1,4 +1,5 @@
 #include "server/server.hpp"
+#include "server/http/server.hpp"
 #include "server/websocket/server.hpp"
 #include "server/webrtc/signal.server.hpp"
 #include "processors/request.processor.hpp"
@@ -26,7 +27,7 @@ namespace lekhanai
             RequestProcessor *processor = new RequestProcessor();
             HttpServer http_server(ioc, port, processor);
             std::cout << "HTTP Server running on port " << port << std::endl;
-            ioc.run();
+            http_server.run(ioc);
         }
         else
         {

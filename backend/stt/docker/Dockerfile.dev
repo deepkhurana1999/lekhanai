@@ -53,6 +53,9 @@ RUN mkdir -p /models/vad && \
     https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx
 
 # Copy application files
+# Use a build argument to bust cache for application files
+ARG CACHEBUST=1
+RUN echo "Cache bust: $CACHE_BUST"
 COPY ./backend/stt/include /app/include
 COPY ./backend/stt/src /app/src
 COPY ./backend/stt/CMakeLists.txt /app/CMakeLists.txt

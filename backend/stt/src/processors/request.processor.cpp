@@ -76,7 +76,9 @@ namespace lekhanai
         {
             if (request_message_type == REQUEST_MESSAGE_TYPE::BINARY)
             {
-                std::vector<std::string> transcriptions = getVoiceTranscriptions(payload);
+                auto audio = getDecodedAudio(payload);
+                auto speech_segments = getSpeechSegments(audio);
+                std::vector<std::string> transcriptions = getVoiceTranscriptions(speech_segments, audio);
                 std::string complete_transcription = "";
                 for (auto &transcription : transcriptions)
                 {
@@ -131,16 +133,14 @@ namespace lekhanai
         return summary_processor->process(transcription);
     }
 
-    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::string &raw_audio)
+    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::vector<float> &audio_data)
     {
-        std::vector<float> audio_data = getDecodedAudio(raw_audio);
         return vad_audio_processor->process(audio_data);
     }
 
-    std::vector<std::string> RequestProcessor::getVoiceTranscriptions(const std::vector<SpeechSegment> speech_segments, const std::string &raw_audio)
+    std::vector<std::string> RequestProcessor::getVoiceTranscriptions(const std::vector<SpeechSegment> speech_segments, const std::vector<float> &audio_data)
     {
         std::vector<std::string> transcriptions;
-        std::vector<float> audio_data = getDecodedAudio(raw_audio);
         if (speech_segments.empty())
         {
             transcriptions.push_back("[BLANK_AUDIO]");

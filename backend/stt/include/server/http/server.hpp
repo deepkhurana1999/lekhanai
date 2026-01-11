@@ -16,6 +16,7 @@ namespace lekhanai
     {
     public:
         HttpServer(boost::asio::io_context &ioc, unsigned short port, RequestProcessor *processor);
+        void run(boost::asio::io_context &ioc);
 
     private:
         tcp::acceptor request_acceptor;
@@ -24,5 +25,5 @@ namespace lekhanai
         void processRequest();
         void handleRequest(tcp::socket socket);
         void handlePostRequest(http::request<http::string_body> &req, http::response<http::string_body> &res);
-    }
+    };
 }
