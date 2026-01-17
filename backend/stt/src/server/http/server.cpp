@@ -21,8 +21,8 @@ namespace lekhanai
 
     void HttpServer::run(boost::asio::io_context &ioc)
     {
-        ioc.run();
         processRequest();
+        ioc.run();
     }
 
     void HttpServer::processRequest()
