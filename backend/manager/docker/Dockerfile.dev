@@ -1,16 +1,18 @@
-FROM python:3.10-slim
+FROM python:3.13-slim
 WORKDIR /app
 
 # Create and activate virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy all source files
-COPY . .
-
 # Install dependencies in venv
 RUN pip install --upgrade pip \
-    && pip install fastapi uvicorn aiofiles sqlmodel psycopg2-binary python-multipart
+    && pip install fastapi uvicorn aiofiles sqlmodel psycopg2-binary python-multipart httpx numpy soundfile librosa
+
+ARG CACHEBUST=1
+RUN echo "Cache bust: $CACHE_BUST"
+# Copy all source files
+COPY . .
 
 WORKDIR /app/src
 

@@ -9,36 +9,11 @@ const COMMANDS = {
 const AppState = {
   IDLE: "idle",
   RECORDING: "recording",
-  VIEWING: "viewing"
+  VIEWING: "viewing",
+  UPLOADING: "uploading"
 }
-
-// Mock historical sessions
-const MOCK_SESSIONS = [
-  {
-    id: 1,
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    audioSource: "Built-in Microphone",
-    transcript: "This is a sample transcription from earlier today. The user spoke about various topics and the system captured their words accurately in real-time.",
-    summary: "Discussion about various topics with accurate real-time transcription.",
-    status: "completed"
-  },
-  {
-    id: 2,
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-    audioSource: "Built-in Microphone",
-    transcript: "Another sample transcription showing how the system works. This demonstrates the library functionality and how past sessions are stored.",
-    summary: "Demo of library functionality and session storage.",
-    status: "completed"
-  },
-  {
-    id: 3,
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-    audioSource: "External Microphone",
-    transcript: "A transcription from yesterday. This helps demonstrate the grouping of sessions by time periods like 'Recent' and 'Earlier'.",
-    summary: "Example of time-based session grouping.",
-    status: "completed"
-  }
-];
+const API_BASE_URL = "http://localhost:5000/api";
+const PAGE_SIZE = 10;
 
 function App() {
   // Core state
@@ -54,8 +29,10 @@ function App() {
 
   // Library state
   const [showLibrary, setShowLibrary] = useState(false);
-  const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [sessionPage, setSessionPage] = useState(0);
+  const [hasMoreSessions, setHasMoreSessions] = useState(true);
 
   // Load microphones on mount
   useEffect(() => {
@@ -79,6 +56,11 @@ function App() {
     };
   }, [appState]);
 
+  // Fetch sessions on mount and when page changes
+  useEffect(() => {
+    fetchSessions(sessionPage);
+  }, [sessionPage]);
+
   async function loadMicrophones() {
     try {
       const devices = await invoke(COMMANDS.GET_INPUT_DEVICES);
@@ -89,6 +71,29 @@ function App() {
       }
     } catch (error) {
       setMicrophones([]);
+    }
+  }
+
+  async function fetchSessions(page) {
+    try {
+      const offset = page * PAGE_SIZE;
+      const response = await fetch(`${API_BASE_URL}/v1/sessions?limit=${PAGE_SIZE}&offset=${offset}`, {
+        method: "GET"
+      });
+      const data = await response.json();
+      // Convert created_at to Date objects if needed
+      const parsed = data.map(s => ({
+        ...s,
+        created_at: new Date(s.created_at)
+      }));
+      if (page === 0) {
+        setSessions(parsed);
+      } else {
+        setSessions(prev => [...prev, ...parsed]);
+      }
+      setHasMoreSessions(parsed.length === PAGE_SIZE);
+    } catch (error) {
+      // fallback: do nothing or show error
     }
   }
 
@@ -123,7 +128,7 @@ function App() {
     if (currentTranscript) {
       const newSession = {
         id: Date.now(),
-        timestamp: new Date(),
+        created_at: new Date(),
         audioSource: selectedMicrophone || "Unknown",
         transcript: currentTranscript,
         summary: "AI-generated summary of the transcription...",
@@ -178,7 +183,7 @@ function App() {
     };
 
     sessions.forEach(session => {
-      const diff = now - session.timestamp;
+      const diff = now - session.created_at;
       const hours = diff / (1000 * 60 * 60);
 
       if (hours < 6) {
@@ -213,7 +218,7 @@ function App() {
     primaryActionHandler = handleStopRecording;
     showSecondaryAction = false;
   } else if (appState === AppState.VIEWING && selectedSession) {
-    const sessionDate = selectedSession.timestamp.toLocaleString('en-US', {
+    const sessionDate = selectedSession.created_at.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -234,6 +239,84 @@ function App() {
     primaryActionText = "New Recording";
     primaryActionHandler = handleNewRecording;
     showSecondaryAction = false;
+  } else if (appState == AppState.UPLOADING) {
+    displayContent = <div className="empty-state">Uploading...</div>;
+    primaryActionText = "New Recording";
+    primaryActionHandler = handleNewRecording;
+    showSecondaryAction = false;
+  }
+
+  async function handleUploadFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setAppState(AppState.UPLOADING);
+    setSelectedSession(null);
+    setCurrentTranscript("");
+
+    // 1. Create session
+    let sessionId = null;
+    let session = null;
+    try {
+      const createResp = await fetch(`${API_BASE_URL}/v1/session/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: "local-user" })
+      });
+      const createData = await createResp.json();
+      sessionId = createData.session_id;
+      session = createData;
+    } catch (error) {
+      setCurrentTranscript("Error creating session: " + error.message);
+      setAppState(AppState.VIEWING);
+      return;
+    }
+
+    // 2. Upload audio and get transcript
+    let transcript = "";
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("session_id", sessionId);
+      const transcribeResp = await fetch(`${API_BASE_URL}/v1/audio/transcribe`, {
+        method: "POST",
+        body: formData
+      });
+      const transcribeData = await transcribeResp.json();
+      transcript = transcribeData.text || "No transcription available.";
+      setCurrentTranscript(transcript);
+      setAppState(AppState.VIEWING);
+    } catch (error) {
+      setCurrentTranscript("Error transcribing audio: " + error.message);
+      setAppState(AppState.VIEWING);
+      return;
+    }
+
+    setCurrentTranscript(transcript);
+
+    // 3. Update session with transcript
+    try {
+      await fetch(`${API_BASE_URL}/v1/session/${sessionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript, session_id: sessionId })
+      });
+    } catch (error) {
+      // Optionally show error, but don't block UI
+      return;
+    }
+
+    // Optionally, save session locally
+    const newSession = {
+      ...session,
+      transcript,
+      created_at: new Date(),
+      audioSource: "Uploaded File",
+      summary: "No summary.",
+      status: "completed"
+    };
+    setSessions(prev => [newSession, ...prev]);
+    handleViewSession(newSession);
   }
 
   return (
@@ -268,9 +351,18 @@ function App() {
           {primaryActionText}
         </button>
         {showSecondaryAction && (
-          <button className="secondary-link" onClick={() => alert("Upload feature coming soon!")}>
-            or upload a file
-          </button>
+          <>
+            <label className="secondary-link" htmlFor="audio-upload-input" style={{ cursor: "pointer" }}>
+              or upload a file
+            </label>
+            <input
+              id="audio-upload-input"
+              type="file"
+              accept="audio/*"
+              style={{ display: "none" }}
+              onChange={handleUploadFile}
+            />
+          </>
         )}
       </div>
 
@@ -287,11 +379,11 @@ function App() {
               <div className="session-group-title">Recent</div>
               {groupedSessions.recent.map(session => (
                 <div
-                  key={session.id}
-                  className={`session-item ${selectedSession?.id === session.id ? "active" : ""}`}
+                  key={session.session_id}
+                  className={`session-item ${selectedSession?.session_id === session.session_id ? "active" : ""}`}
                   onClick={() => handleViewSession(session)}
                 >
-                  <div className="session-time">{formatSessionTime(session.timestamp)}</div>
+                  <div className="session-time">{formatSessionTime(session.created_at)}</div>
                   <div className="session-preview">{session.transcript}</div>
                 </div>
               ))}
@@ -303,11 +395,11 @@ function App() {
               <div className="session-group-title">Earlier</div>
               {groupedSessions.earlier.map(session => (
                 <div
-                  key={session.id}
-                  className={`session-item ${selectedSession?.id === session.id ? "active" : ""}`}
+                  key={session.session_id}
+                  className={`session-item ${selectedSession?.session_id === session.session_id ? "active" : ""}`}
                   onClick={() => handleViewSession(session)}
                 >
-                  <div className="session-time">{formatSessionTime(session.timestamp)}</div>
+                  <div className="session-time">{formatSessionTime(session.created_at)}</div>
                   <div className="session-preview">{session.transcript}</div>
                 </div>
               ))}
@@ -319,16 +411,20 @@ function App() {
               <div className="session-group-title">Archive</div>
               {groupedSessions.archive.map(session => (
                 <div
-                  key={session.id}
-                  className={`session-item ${selectedSession?.id === session.id ? "active" : ""}`}
+                  key={session.session_id}
+                  className={`session-item ${selectedSession?.session_id === session.session_id ? "active" : ""}`}
                   onClick={() => handleViewSession(session)}
                 >
-                  <div className="session-time">{formatSessionTime(session.timestamp)}</div>
+                  <div className="session-time">{formatSessionTime(session.created_at)}</div>
                   <div className="session-preview">{session.transcript}</div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+        <div className="pagination-controls">
+          <button disabled={sessionPage === 0} onClick={() => setSessionPage(p => Math.max(0, p - 1))}>Previous</button>
+          <button disabled={!hasMoreSessions} onClick={() => setSessionPage(p => p + 1)}>Next</button>
         </div>
       </div>
 
@@ -368,13 +464,13 @@ function App() {
                 className="btn-primary"
                 onClick={() => {
                   setShowMicModal(false);
-                  if (appState === AppState.IDLE) {
+                  if (appState === AppState.session_idLE) {
                     startRecording();
                   }
                 }}
                 style={{ flex: 1, minWidth: 'auto' }}
               >
-                {appState === AppState.IDLE ? "Start Recording" : "Done"}
+                {appState === AppState.session_idLE ? "Start Recording" : "Done"}
               </button>
               <button
                 className="secondary-link"
