@@ -45,8 +45,10 @@ namespace lekhanai
         try
         {
             boost::beast::flat_buffer buffer;
-            http::request<http::string_body> req;
-            http::read(socket, buffer, req);
+            http::request_parser<http::string_body> parser;
+            parser.body_limit(10 * 1024 * 1024);
+            http::read(socket, buffer, parser);
+            auto req = parser.release();
 
             http::response<http::string_body> res{http::status::ok, req.version()};
             res.set(http::field::server, "stt-http");
