@@ -29,6 +29,7 @@ async def proxy_transcribe_audio(file: UploadFile = File(...)):
             data = librosa.resample(data, orig_sr=samplerate, target_sr=16000)
             samplerate = 16000
         audio_list = data.tolist()
+        print(f"Audio length (samples): {len(audio_list)}, Sample rate: {samplerate}")
         # 3. Call VAD endpoint to get segments
         async with httpx.AsyncClient() as client:
             vad_resp = await client.post(f"{STT_BASE_URL}/api/v1/vad", json={"audio": audio_list})
@@ -36,10 +37,12 @@ async def proxy_transcribe_audio(file: UploadFile = File(...)):
             segments = vad_resp.json().get("segments", [])
             # 4. Call transcribe endpoint with segments and audio
             transcribe_payload = {"segments": segments, "audio": audio_list}
-            transcribe_resp = await client.post(f"{STT_BASE_URL}/api/v1/transcribe", json=transcribe_payload)
+            transcribe_resp = await client.post(f"{STT_BASE_URL}/api/v1/transcribe", json=transcribe_payload, timeout=120.0)
             transcribe_resp.raise_for_status()
             return transcribe_resp.json()
     except Exception as e:
         print(f"Error in proxy_transcribe_audio: {e}")
         print(e)
+        print("Exception type:", type(e))
+        print("Exception repr:", repr(e))
         raise e
