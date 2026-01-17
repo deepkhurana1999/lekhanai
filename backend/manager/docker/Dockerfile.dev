@@ -1,0 +1,17 @@
+FROM python:3.10-slim
+WORKDIR /app
+
+# Create and activate virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy all source files
+COPY . .
+
+# Install dependencies in venv
+RUN pip install --upgrade pip \
+    && pip install fastapi uvicorn aiofiles sqlmodel psycopg2-binary python-multipart
+
+WORKDIR /app/src
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000"]

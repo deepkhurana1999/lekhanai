@@ -7,6 +7,18 @@ services:
     networks:
       - lekhanai-network
 
+  postgres:
+    image: postgres:18
+    container_name: lekhanai-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: session_db
+    ports:
+      - "5432:5432"
+    networks:
+      - lekhanai-network
+
   stt:
     build:
       context: .
@@ -22,10 +34,16 @@ services:
   manager:
     build:
       context: ./backend/manager
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile.dev
     container_name: lekhanai-manager
     ports:
       - "5000:5000"
+    env_file:
+      - ./backend/manager/template.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/session_db
+    depends_on:
+      - postgres
     networks:
       - lekhanai-network
 
