@@ -46,7 +46,7 @@ namespace lekhanai
         {
             boost::beast::flat_buffer buffer;
             http::request_parser<http::string_body> parser;
-            parser.body_limit(10 * 1024 * 1024);
+            parser.body_limit(10ULL * 1024 * 1024);
             http::read(socket, buffer, parser);
             auto req = parser.release();
 
