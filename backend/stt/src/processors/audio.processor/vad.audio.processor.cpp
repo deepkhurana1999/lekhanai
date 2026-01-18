@@ -1,5 +1,7 @@
 #include <string>
 #include <memory>
+#include <thread>
+#include <iostream>
 #include <onnxruntime_cxx_api.h>
 #include "processors/vad.processor/vad.processor.hpp"
 #include "processors/audio.processor/vad.audio.processor.hpp"
@@ -45,9 +47,22 @@ namespace lekhanai
         std::fill(context.begin(), context.end(), 0.0f);
     }
 
-    std::vector<SpeechSegment> VADAudioProcessor::process(const std::vector<float> &audio)
+    std::vector<SpeechSegment> VADAudioProcessor::process(const std::vector<float> &audio, VADState &vad_state)
     {
+        std::lock_guard<std::mutex> lock(thread_mutex);
         reset_states();
+        if (vad_state.state.size() == state.size())
+        {
+            state = vad_state.state;
+            if (vad_state.context.size() == context.size())
+            {
+                context = vad_state.context;
+            }
+            else
+            {
+                throw std::invalid_argument("Expected context #" + std::to_string(context.size()) + " size.");
+            }
+        }
         const float threshold = voice_activation_threshold;
         const int audio_length_samples = static_cast<int>(audio.size());
         // Process audio in chunks of window_size_samples (e.g., 512 samples)
@@ -159,6 +174,10 @@ namespace lekhanai
             temp_end = 0;
             triggered = false;
         }
+        vad_state.context = context;
+        vad_state.state = state;
+        vad_state.current_speech = current_speech;
+        vad_state.triggered = triggered;
         return speeches;
     }
 }

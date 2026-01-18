@@ -2,6 +2,8 @@
 #include <vector>
 #include <deque>
 #include <string>
+#include <mutex>
+#include <thread>
 #include "processors/vad.processor/vad.processor.hpp"
 
 namespace lekhanai
@@ -24,6 +26,19 @@ namespace lekhanai
         bool operator==(const SpeechSegment &a) const
         {
             return (start == a.start && end == a.end);
+        }
+    };
+
+    class VADState
+    {
+    public:
+        bool triggered;
+        std::vector<float> state;
+        std::vector<float> context;
+        SpeechSegment current_speech;
+
+        VADState() : triggered(false), state({}), context({}), current_speech(SpeechSegment())
+        {
         }
     };
 
@@ -58,7 +73,11 @@ namespace lekhanai
 
         void reset_states();
 
+    protected:
+        std::mutex thread_mutex; // Guard for thread safety if needed
+
     public:
+        VADState final_sate;
         VADAudioProcessor(
             VADProcessor *vad_processor,
             int sample_rate,
@@ -72,7 +91,7 @@ namespace lekhanai
             int speech_pad_samples,
             float voice_activation_threshold);
 
-        std::vector<SpeechSegment> process(const std::vector<float> &samples);
+        std::vector<SpeechSegment> process(const std::vector<float> &samples, VADState &vad_state);
     };
 
 }

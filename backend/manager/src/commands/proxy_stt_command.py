@@ -31,10 +31,34 @@ async def proxy_transcribe_audio(file: UploadFile = File(...)):
         audio_list = data.tolist()
         print(f"Audio length (samples): {len(audio_list)}, Sample rate: {samplerate}")
         # 3. Call VAD endpoint to get segments
+        batch_size = len(audio_list)  # e.g., 1 second batches at 16kHz 
         async with httpx.AsyncClient() as client:
-            vad_resp = await client.post(f"{STT_BASE_URL}/api/v1/vad", json={"audio": audio_list})
-            vad_resp.raise_for_status()
-            segments = vad_resp.json().get("segments", [])
+            batches = [audio_list[i:i + batch_size ] for i in range(0, len(audio_list), batch_size)]
+            total_segments = []
+            vad_state = {"state": [], "context": []}
+            for batch_idx, batch in enumerate(batches):
+                print(f"Batch {batch_idx} length: {len(batch)}")
+                payload = {
+                    "audio": batch,
+                    "state": vad_state.get("state", []),
+                    "context": vad_state.get("context", [])
+                }
+                vad_resp = await client.post(f"{STT_BASE_URL}/api/v1/vad", json=payload)
+                vad_resp.raise_for_status()
+                segments = vad_resp.json().get("segments", [])
+                vad_state["state"] = (vad_resp.json().get("state", []))
+                vad_state["context"] = (vad_resp.json().get("context", []))
+
+                for seg in segments:
+                    # Adjust segment timestamps based on batch index
+                    adjseg = {
+                        "start": int(batch_idx * batch_size) + seg["start"],
+                        "end": int(batch_idx * batch_size) + seg["end"]
+                    }
+                    total_segments.append(adjseg)
+
+            segments = total_segments
+            print(f"Total segments length: {len(segments)}")
             # 4. Call transcribe endpoint with segments and audio
             transcribe_payload = {"segments": segments, "audio": audio_list}
             transcribe_resp = await client.post(f"{STT_BASE_URL}/api/v1/transcribe", json=transcribe_payload, timeout=120.0)

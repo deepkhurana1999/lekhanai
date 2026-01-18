@@ -77,7 +77,8 @@ namespace lekhanai
             if (request_message_type == REQUEST_MESSAGE_TYPE::BINARY)
             {
                 auto audio = getDecodedAudio(payload);
-                auto speech_segments = getSpeechSegments(audio);
+                VADState vad_state;
+                auto speech_segments = getSpeechSegments(audio, vad_state);
                 std::vector<std::string> transcriptions = getVoiceTranscriptions(speech_segments, audio);
                 std::string complete_transcription = "";
                 for (auto &transcription : transcriptions)
@@ -133,9 +134,9 @@ namespace lekhanai
         return summary_processor->process(transcription);
     }
 
-    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::vector<float> &audio_data)
+    std::vector<SpeechSegment> RequestProcessor::getSpeechSegments(const std::vector<float> &audio_data, VADState &vad_state)
     {
-        return vad_audio_processor->process(audio_data);
+        return vad_audio_processor->process(audio_data, vad_state);
     }
 
     std::vector<std::string> RequestProcessor::getVoiceTranscriptions(const std::vector<SpeechSegment> speech_segments, const std::vector<float> &audio_data)

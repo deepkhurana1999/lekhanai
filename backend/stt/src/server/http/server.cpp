@@ -80,14 +80,38 @@ namespace lekhanai
         {
             // Expect JSON: { "audio": [float, float, ...] }
             auto input_json = nlohmann::json::parse(req.body());
+            VADState vad_state;
+            // Extract audio and VAD state if provided
             std::vector<float> audio = input_json["audio"].get<std::vector<float>>();
-            auto segments = request_processor->getSpeechSegments(audio);
+            vad_state.state = input_json.value("state", std::vector<float>{});
+            vad_state.context = input_json.value("context", std::vector<float>{});
+            vad_state.current_speech.start = input_json.value("current_speech_start", -1);
+            vad_state.current_speech.end = input_json.value("current_speech_end", -1);
+            vad_state.triggered = input_json.value("triggered", false);
+
+            // Process VAD
+            auto segments = request_processor->getSpeechSegments(audio, vad_state);
+
+            // Prepare response
             nlohmann::json out;
+            out["current_speech_start"] = vad_state.current_speech.start;
+            out["current_speech_end"] = vad_state.current_speech.end;
+            out["triggered"] = vad_state.triggered;
             out["segments"] = nlohmann::json::array();
+            out["state"] = nlohmann::json::array();
             for (const auto &seg : segments)
             {
                 out["segments"].push_back({{"start", seg.start}, {"end", seg.end}});
             }
+            for (const auto &s : vad_state.state)
+            {
+                out["state"].push_back(s);
+            }
+            for (const auto &c : vad_state.context)
+            {
+                out["context"].push_back(c);
+            }
+
             res.body() = out.dump();
         }
         else if (target == "/api/v1/transcribe")
