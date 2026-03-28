@@ -7,16 +7,54 @@ services:
     networks:
       - lekhanai-network
 
-  backend:
+  postgres:
+    image: postgres:18
+    container_name: lekhanai-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: session_db
+    ports:
+      - "5432:5432"
+    networks:
+      - lekhanai-network
+
+  stt:
     build:
       context: .
-      dockerfile: ./backend/docker/Dockerfile.dev
-    container_name: lekhanai-backend
+      dockerfile: ./backend/stt/docker/Dockerfile.dev
+    container_name: lekhanai-stt
     env_file:
-      - ./backend/template.env
+      - ./backend/stt/template.env
     ports:
       - "8080:8080"
-    command: sh -c "cd /app && ./build/lekhanai-backend"
+    command: sh -c "cd /app && ./build/stt"
+    networks:
+      - lekhanai-network
+  manager:
+    build:
+      context: ./backend/manager
+      dockerfile: docker/Dockerfile.dev
+    container_name: lekhanai-manager
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/manager/template.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/session_db
+      STT_BASE_URL: http://stt:8080
+    depends_on:
+      - postgres
+    networks:
+      - lekhanai-network
+
+  analyser:
+    build:
+      context: ./backend/analyser
+      dockerfile: Dockerfile
+    container_name: lekhanai-analyser
+    ports:
+      - "8004:8004"
     networks:
       - lekhanai-network
 networks:

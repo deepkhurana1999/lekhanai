@@ -1,10 +1,10 @@
-[submodule "backend/libraries/whisper.cpp"]
-	path = backend/libraries/whisper.cpp
+[submodule "backend/stt/libraries/whisper.cpp"]
+	path = backend/stt/libraries/whisper.cpp
 	url = https://github.com/deepkhurana1999/whisper.cpp.git
 	branch = v1.8.0_parallel
-[submodule "backend/libraries/libdatachannel"]
-	path = backend/libraries/libdatachannel
+[submodule "backend/stt/libraries/libdatachannel"]
+	path = backend/stt/libraries/libdatachannel
 	url = https://github.com/paullouisageneau/libdatachannel.git
-[submodule "backend/libraries/ollama-hpp"]
-	path = backend/libraries/ollama-hpp
+[submodule "backend/stt/libraries/ollama-hpp"]
+	path = backend/stt/libraries/ollama-hpp
 	url = https://github.com/jmont-dev/ollama-hpp.git
