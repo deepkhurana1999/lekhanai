@@ -25,5 +25,6 @@ namespace lekhanai
         void processRequest();
         void handleRequest(tcp::socket socket);
         void handlePostRequest(http::request<http::string_body> &req, http::response<http::string_body> &res);
+        void handleProcessRequest(http::request<http::string_body> &req, http::response<http::string_body> &res);
     };
 }

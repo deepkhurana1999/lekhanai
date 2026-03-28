@@ -7,7 +7,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install dependencies in venv
 RUN pip install --upgrade pip \
-    && pip install fastapi uvicorn aiofiles sqlmodel psycopg2-binary python-multipart httpx numpy soundfile librosa
+    && pip install fastapi uvicorn aiofiles sqlmodel psycopg2-binary python-multipart httpx numpy soundfile librosa websockets
 
 ARG CACHEBUST=1
 RUN echo "Cache bust: $CACHE_BUST"

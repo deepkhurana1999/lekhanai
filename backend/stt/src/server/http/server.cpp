@@ -46,7 +46,7 @@ namespace lekhanai
         {
             boost::beast::flat_buffer buffer;
             http::request_parser<http::string_body> parser;
-            parser.body_limit(10ULL * 1024 * 1024);
+            parser.body_limit(50ULL * 1024 * 1024);
             http::read(socket, buffer, parser);
             auto req = parser.release();
 
@@ -133,10 +133,69 @@ namespace lekhanai
             out["text"] = text;
             res.body() = out.dump();
         }
+        else if (target == "/api/v1/process")
+        {
+            // Combined endpoint: accepts raw binary PCM int16 (16kHz, mono)
+            // Content-Type: application/octet-stream
+            // Runs VAD + Whisper in one call — no double transfer, no JSON float inflation
+            handleProcessRequest(req, res);
+        }
         else
         {
             res.result(http::status::not_found);
             res.body() = "{\"error\":\"Not found\"}";
+        }
+    }
+
+    void HttpServer::handleProcessRequest(http::request<http::string_body> &req, http::response<http::string_body> &res)
+    {
+        try
+        {
+            const std::string &body = req.body();
+
+            if (body.empty())
+            {
+                res.result(http::status::bad_request);
+                res.body() = "{\"error\":\"Empty audio body\"}";
+                return;
+            }
+
+            if (body.size() % 2 != 0)
+            {
+                res.result(http::status::bad_request);
+                res.body() = "{\"error\":\"Invalid PCM data: odd byte count\"}";
+                return;
+            }
+
+            // Convert int16 PCM -> float32 [-1, 1]
+            const size_t sample_count = body.size() / 2;
+            const int16_t *pcm = reinterpret_cast<const int16_t *>(body.data());
+            std::vector<float> audio(sample_count);
+            constexpr float norm = 1.0f / 32768.0f;
+            for (size_t i = 0; i < sample_count; ++i)
+                audio[i] = static_cast<float>(pcm[i]) * norm;
+
+            // VAD -> speech segments
+            VADState vad_state;
+            auto segments = request_processor->getSpeechSegments(audio, vad_state);
+
+            // Whisper transcription
+            std::vector<std::string> transcriptions = request_processor->getVoiceTranscriptions(segments, audio);
+            std::string text;
+            for (const auto &t : transcriptions)
+                text += t + " ";
+
+            nlohmann::json out;
+            out["text"] = text;
+            res.body() = out.dump();
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Error in /api/v1/process: " << e.what() << std::endl;
+            res.result(http::status::internal_server_error);
+            nlohmann::json err;
+            err["error"] = e.what();
+            res.body() = err.dump();
         }
     }
 }

@@ -1,10 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
 const COMMANDS = {
-  GET_INPUT_DEVICES: "get_input_devices"
+  GET_INPUT_DEVICES: "get_input_devices",
+  START_RECORDING: "start_recording",
+  STOP_RECORDING: "stop_recording",
 };
+
+const MANAGER_WS_URL = "ws://localhost:5000";
 
 const AppState = {
   IDLE: "idle",
@@ -17,15 +22,18 @@ const PAGE_SIZE = 10;
 
 function App() {
   // Core state
-  const [appState, setAppState] = useState(AppState.IDLE); // 'idle', 'recording', 'viewing'
+  const [appState, setAppState] = useState(AppState.IDLE);
   const [microphones, setMicrophones] = useState([]);
   const [selectedMicrophone, setSelectedMicrophone] = useState(null);
+  const [selectedMicrophoneId, setSelectedMicrophoneId] = useState(null);
   const [showMicModal, setShowMicModal] = useState(false);
 
   // Recording state
   const [currentTranscript, setCurrentTranscript] = useState("");
+  const [activeSessionId, setActiveSessionId] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [timerInterval, setTimerInterval] = useState(null);
+  const transcriptionUnlistenRef = useRef(null);
 
   // Library state
   const [showLibrary, setShowLibrary] = useState(false);
@@ -37,6 +45,15 @@ function App() {
   // Load microphones on mount
   useEffect(() => {
     loadMicrophones();
+  }, []);
+
+  // Cleanup transcription listener on unmount
+  useEffect(() => {
+    return () => {
+      if (transcriptionUnlistenRef.current) {
+        transcriptionUnlistenRef.current();
+      }
+    };
   }, []);
 
   // Timer effect
@@ -65,9 +82,9 @@ function App() {
     try {
       const devices = await invoke(COMMANDS.GET_INPUT_DEVICES);
       setMicrophones(devices || []);
-      // Auto-select first mic if available
       if (devices && devices.length > 0 && !selectedMicrophone) {
         setSelectedMicrophone(devices[0].name);
+        setSelectedMicrophoneId(devices[0].id);
       }
     } catch (error) {
       setMicrophones([]);
@@ -102,43 +119,75 @@ function App() {
     setShowMicModal(true);
   }
 
-  function startRecording() {
+  async function startRecording() {
     setShowMicModal(false);
     setAppState(AppState.RECORDING);
     setCurrentTranscript("");
     setElapsedTime(0);
     setSelectedSession(null);
 
-    // Simulate transcription (in real app, this would be from Tauri backend)
-    setTimeout(() => {
-      setCurrentTranscript("This is a simulated transcription. ");
-      setTimeout(() => {
-        setCurrentTranscript(prev => prev + "The words appear in real-time as you speak. ");
-        setTimeout(() => {
-          setCurrentTranscript(prev => prev + "The interface remains clean and minimal throughout the process.");
-        }, 2000);
-      }, 2000);
-    }, 1000);
+    try {
+      // 1. Create session in Manager
+      const resp = await fetch(`http://localhost:5000/api/v1/session/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: "local-user" }),
+      });
+      const { session_id } = await resp.json();
+      setActiveSessionId(session_id);
+
+      // 2. Subscribe to transcription events BEFORE starting capture
+      if (transcriptionUnlistenRef.current) transcriptionUnlistenRef.current();
+      transcriptionUnlistenRef.current = await listen("transcription", (event) => {
+        const text = event.payload?.text;
+        if (text) {
+          setCurrentTranscript(prev => prev ? prev.trimEnd() + " " + text : text);
+        }
+      });
+
+      // 3. Start CPAL capture → Manager WebSocket
+      await invoke(COMMANDS.START_RECORDING, {
+        deviceId: selectedMicrophoneId ?? "0",
+        sessionId: session_id,
+        managerUrl: MANAGER_WS_URL,
+      });
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      setCurrentTranscript("Error starting recording: " + error);
+    }
   }
 
-  function handleStopRecording() {
+  async function handleStopRecording() {
+    try {
+      await invoke(COMMANDS.STOP_RECORDING);
+    } catch (e) {
+      console.warn("stop_recording error:", e);
+    }
+
+    // Unlisten transcription events
+    if (transcriptionUnlistenRef.current) {
+      transcriptionUnlistenRef.current();
+      transcriptionUnlistenRef.current = null;
+    }
+
     setAppState(AppState.IDLE);
 
-    // Save session
-    if (currentTranscript) {
+    if (currentTranscript && activeSessionId) {
+      // Optimistically add to library; backend already persisted incrementally
       const newSession = {
-        id: Date.now(),
+        session_id: activeSessionId,
         created_at: new Date(),
-        audioSource: selectedMicrophone || "Unknown",
+        audioSource: selectedMicrophone || "Microphone",
         transcript: currentTranscript,
-        summary: "AI-generated summary of the transcription...",
-        status: "completed"
+        summary: "",
+        status: "completed",
       };
       setSessions(prev => [newSession, ...prev]);
     }
 
     setCurrentTranscript("");
     setElapsedTime(0);
+    setActiveSessionId(null);
   }
 
   function handleViewSession(session) {
@@ -452,7 +501,10 @@ function App() {
                   <li
                     key={index}
                     className={`microphone-item ${selectedMicrophone === mic.name ? "selected" : ""}`}
-                    onClick={() => setSelectedMicrophone(mic.name)}
+                    onClick={() => {
+                      setSelectedMicrophone(mic.name);
+                      setSelectedMicrophoneId(mic.id);
+                    }}
                   >
                     {mic.name || `Microphone ${index + 1}`}
                   </li>
@@ -464,13 +516,13 @@ function App() {
                 className="btn-primary"
                 onClick={() => {
                   setShowMicModal(false);
-                  if (appState === AppState.session_idLE) {
+                  if (appState === AppState.IDLE) {
                     startRecording();
                   }
                 }}
                 style={{ flex: 1, minWidth: 'auto' }}
               >
-                {appState === AppState.session_idLE ? "Start Recording" : "Done"}
+                {appState === AppState.IDLE ? "Start Recording" : "Done"}
               </button>
               <button
                 className="secondary-link"

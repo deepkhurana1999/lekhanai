@@ -1,3 +1,8 @@
+// =============================================================================
+// DEPRECATED: WebSocket server has been replaced by the Manager service WebSocket
+// bridge (/ws/transcribe/{session_id}). STT now operates as a pure HTTP service.
+// This file is kept for reference only and is NOT used in the active code path.
+// =============================================================================
 #pragma once
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>

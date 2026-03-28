@@ -532,6 +532,33 @@ body {
   }
 }
 
+/* Real-time transcription text — new segments fade in */
+@keyframes wordAppear {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.transcription-text span.word-new {
+  animation: wordAppear 350ms ease-out forwards;
+  display: inline;
+}
+
+.transcription-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--color-recording);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: pulse 1s ease-in-out infinite;
+}
+
 /* ===== Responsive ===== */
 
 @media (max-width: 768px) {

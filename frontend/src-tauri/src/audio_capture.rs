@@ -5,21 +5,17 @@ use cpal::traits::StreamTrait;
 use crate::audio_engine::{AudioEngine, AudioDevice, DeviceConfig};
 use tauri::Emitter;
 use tauri::WebviewWindow;
+
 // ============================================================================
 // AUDIO DATA STRUCTURE
 // ============================================================================
 
-/// Audio data payload sent to frontend
-/// Contains PCM samples and metadata
+/// Audio data payload sent to frontend for waveform visualization
 #[derive(Serialize, Clone)]
 pub struct AudioData {
-    /// Sample rate in Hz (e.g., 48000)
     pub sample_rate: u32,
-    /// Number of channels (e.g., 1 for mono, 2 for stereo)
     pub channels: u16,
-    /// Raw PCM samples as f32 (-1.0 to 1.0)
     pub data: Vec<f32>,
-    /// Timestamp in milliseconds since UNIX epoch
     pub timestamp: u64,
 }
 
@@ -27,14 +23,10 @@ pub struct AudioData {
 // RECORDING STATE ENUM
 // ============================================================================
 
-/// Current recording state
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum RecordingState {
-    /// Not recording, stream is stopped
     Stopped,
-    /// Currently recording, stream is active
     Recording,
-    /// Error occurred during recording
     Error,
 }
 
@@ -42,54 +34,34 @@ pub enum RecordingState {
 // AUDIO CAPTURE STATE MANAGER
 // ============================================================================
 
-/// Manages audio capture lifecycle and state
-///
-/// This is the central state manager that:
-/// 1. Owns the CPAL audio stream
-/// 2. Tracks recording state
-/// 3. Coordinates start/stop operations
-/// 4. Emits audio events to frontend
-/// 5. Delegates CPAL operations to AudioEngine
-///
-/// The stream MUST be kept alive in Arc<Mutex<>> to prevent it
-/// from being dropped, which would stop audio capture.
 pub struct AudioCapture {
-    /// Active audio stream (Option allows None when not recording)
-    /// CRITICAL: Must be wrapped in Arc<Mutex<>> to keep stream alive
-    /// while it's in use and to allow thread-safe access
+    /// Active CPAL audio stream — kept alive in Arc<Mutex<>> 
     stream: Arc<Mutex<Option<Stream>>>,
-
-    /// Current recording state
-    /// Tracks: Stopped, Recording, or Error
     state: Arc<Mutex<RecordingState>>,
-
-    /// Device configuration of the current recording session
-    /// Contains: sample_rate, channels, CPAL StreamConfig
-    /// Only Some() while recording
     config: Arc<Mutex<Option<DeviceConfig>>>,
-
-    /// Reference to Tauri window for emitting events
-    /// Used to send audio-data events to frontend
     window: WebviewWindow,
 }
 
 // ============================================================================
-// AUDIO CAPTURE IMPLEMENTATION
+// HELPERS
+// ============================================================================
+
+/// Convert f32 mono audio [-1, 1] to raw int16 PCM bytes (little-endian).
+pub fn f32_mono_to_pcm16(samples: &[f32]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(samples.len() * 2);
+    for &s in samples {
+        let clamped = s.clamp(-1.0, 1.0);
+        let i16_val = (clamped * 32767.0) as i16;
+        out.extend_from_slice(&i16_val.to_le_bytes());
+    }
+    out
+}
+
+// ============================================================================
+// IMPLEMENTATION
 // ============================================================================
 
 impl AudioCapture {
-    /// Create a new AudioCapture manager
-    ///
-    /// # Arguments
-    /// * `window` - Tauri window reference for emitting events
-    ///
-    /// # Returns
-    /// AudioCapture initialized with no active stream
-    ///
-    /// # Example
-    /// ```rust
-    /// let audio_capture = AudioCapture::new(window);
-    /// ```
     pub fn new(window: WebviewWindow) -> Self {
         Self {
             stream: Arc::new(Mutex::new(None)),
@@ -99,345 +71,162 @@ impl AudioCapture {
         }
     }
 
-    // ========================================================================
-    // STATE QUERY METHODS
-    // ========================================================================
-
-    /// Check if currently recording
-    ///
-    /// # Returns
-    /// true if RecordingState is Recording, false otherwise
-    ///
-    /// # Example
-    /// ```rust
-    /// if audio_capture.is_recording() {
-    ///     println!("Recording in progress");
-    /// }
-    /// ```
     pub fn is_recording(&self) -> bool {
-        let state = self.state.lock().unwrap();
-        *state == RecordingState::Recording
+        *self.state.lock().unwrap() == RecordingState::Recording
     }
 
-    /// Get current recording state
-    ///
-    /// # Returns
-    /// Current RecordingState (Stopped, Recording, or Error)
-    ///
-    /// # Example
-    /// ```rust
-    /// match audio_capture.get_state() {
-    ///     RecordingState::Recording => println!("Recording"),
-    ///     RecordingState::Stopped => println!("Stopped"),
-    ///     RecordingState::Error => println!("Error"),
-    /// }
-    /// ```
     pub fn get_state(&self) -> RecordingState {
-        let state = self.state.lock().unwrap();
-        *state
+        *self.state.lock().unwrap()
     }
 
-    /// Get current device configuration
-    ///
-    /// # Returns
-    /// Some(DeviceConfig) if recording, None otherwise
-    /// DeviceConfig contains: sample_rate, channels, CPAL config
-    ///
-    /// # Example
-    /// ```rust
-    /// if let Some(config) = audio_capture.get_config() {
-    ///     println!("Sample rate: {}", config.sample_rate);
-    ///     println!("Channels: {}", config.channels);
-    /// }
-    /// ```
     pub fn get_config(&self) -> Option<DeviceConfig> {
-        let config = self.config.lock().unwrap();
-        config.clone()
+        self.config.lock().unwrap().clone()
     }
 
-    // ========================================================================
-    // DEVICE ENUMERATION
-    // ========================================================================
-
-    /// Get list of available microphones
-    ///
-    /// # Returns
-    /// Result with Vec of AudioDevice on success
-    /// - id: unique identifier (device index as string)
-    /// - name: display name (from OS)
-    /// - channels: number of channels
-    ///
-    /// # Example
-    /// ```rust
-    /// let devices = audio_capture.get_devices()?;
-    /// for device in devices {
-    ///     println!("{}: {} ({}ch)", device.id, device.name, device.channels);
-    /// }
-    /// ```
     pub fn get_devices(&self) -> Result<Vec<AudioDevice>, String> {
-        // Delegate to AudioEngine (pure CPAL operations)
         AudioEngine::list_input_devices()
     }
 
     // ========================================================================
-    // RECORDING START
+    // REALTIME RECORDING (WebSocket mode)
     // ========================================================================
 
-    /// Start capturing audio from a device
+    /// Start capturing audio and stream PCM chunks to the Manager WebSocket.
     ///
-    /// # Arguments
-    /// * `device_id` - Device ID string (from get_devices)
+    /// Audio pipeline per CPAL callback invocation:
+    ///   native samples → mix to mono f32 → accumulate 5s buffer
+    ///   → resample to 16kHz (if needed) → int16 PCM bytes → ws_sender channel
     ///
-    /// # Returns
-    /// Ok(message) on success
-    /// Err(reason) if already recording or device not found
-    ///
-    /// # What it does
-    /// 1. Checks if not already recording (prevents double-start)
-    /// 2. Parses device_id to numeric index
-    /// 3. Gets device configuration via AudioEngine
-    /// 4. Builds CPAL stream with audio callback via AudioEngine
-    /// 5. Callback processes samples and emits to frontend
-    /// 6. Starts the stream (begins audio capture)
-    /// 7. Stores stream in Arc<Mutex<>> to keep it alive
-    /// 8. Updates state to Recording
-    ///
-    /// # Example
-    /// ```rust
-    /// audio_capture.start("0")?;
-    /// println!("Recording started");
-    /// ```
-    pub fn start(&self, device_id: String) -> Result<String, String> {
-        // ====================================================================
-        // STEP 1: Validate not already recording
-        // ====================================================================
+    /// Also emits `audio-data` events for waveform visualization in React.
+    pub fn start_with_ws(
+        &self,
+        device_id: String,
+        ws_sender: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
+    ) -> Result<String, String> {
+        use rubato::{
+            Resampler, SincFixedIn, SincInterpolationParameters,
+            SincInterpolationType, WindowFunction,
+        };
+
         if self.is_recording() {
             return Err("Already recording".to_string());
         }
 
-        // ====================================================================
-        // STEP 2: Parse device ID to numeric index
-        // ====================================================================
         let device_index: usize = device_id
             .parse()
-            .map_err(|_| "Invalid device ID format".to_string())?;
+            .map_err(|_| "Invalid device ID".to_string())?;
 
-        // ====================================================================
-        // STEP 3: Get device configuration from AudioEngine
-        // ====================================================================
         let device_config = AudioEngine::get_device_config(device_index)
-            .map_err(|e| format!("Failed to get device config: {}", e))?;
+            .map_err(|e| format!("Failed to get device config: {e}"))?;
 
-        // Extract config for use in callback
+        let native_sr = device_config.sample_rate;
+        let native_ch = device_config.channels as usize;
+        let target_sr: u32 = 16000;
+
+        // Buffer 5 seconds of mono f32 at native sample rate before flushing
+        let buffer_cap = (native_sr as usize) * 5;
+        let sample_buf: Arc<Mutex<Vec<f32>>> =
+            Arc::new(Mutex::new(Vec::with_capacity(buffer_cap)));
+
+        let buf_clone = sample_buf.clone();
+        let ws_tx = ws_sender.clone();
         let window = self.window.clone();
-        let sample_rate = device_config.sample_rate;
-        let channels = device_config.channels;
 
-        // ====================================================================
-        // STEP 4: Build audio stream with callback
-        // ====================================================================
-        // The callback is called 100+ times per second with audio samples
         let (stream, config) = AudioEngine::build_stream(
             device_index,
             move |data: &[f32], _info: &cpal::InputCallbackInfo| {
-                // ============================================================
-                // AUDIO CALLBACK (runs in separate thread)
-                // ============================================================
-                // This closure is called whenever new audio data arrives
-                // from the microphone
+                // --- Mix down to mono ---
+                let mono: Vec<f32> = if native_ch == 1 {
+                    data.to_vec()
+                } else {
+                    data.chunks(native_ch)
+                        .map(|ch| ch.iter().sum::<f32>() / native_ch as f32)
+                        .collect()
+                };
 
-                // Take first 1024 samples for frontend visualization
-                let chunk_size = 1024;
-                let samples: Vec<f32> = data.iter()
-                    .take(chunk_size)
-                    .copied()
-                    .collect();
+                // --- Emit waveform for visualization ---
+                let _ = window.emit(
+                    "audio-data",
+                    &serde_json::json!({
+                        "sample_rate": native_sr,
+                        "channels": 1,
+                        "data": &mono[..mono.len().min(512)],
+                    }),
+                );
 
-                // Only emit if we have data
-                if !samples.is_empty() {
-                    // Create AudioData payload
-                    let payload = AudioData {
-                        sample_rate,
-                        channels,
-                        data: samples,
-                        timestamp: std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_millis() as u64,
+                // --- Accumulate into buffer ---
+                let mut buf = buf_clone.lock().unwrap();
+                buf.extend_from_slice(&mono);
+
+                if buf.len() < buffer_cap {
+                    return;
+                }
+
+                // --- Flush: resample if needed, convert to int16, send ---
+                let chunk = buf.clone();
+                buf.clear();
+                drop(buf);
+
+                let pcm_bytes = if native_sr == target_sr {
+                    f32_mono_to_pcm16(&chunk)
+                } else {
+                    let ratio = target_sr as f64 / native_sr as f64;
+                    let params = SincInterpolationParameters {
+                        sinc_len: 256,
+                        f_cutoff: 0.95,
+                        interpolation: SincInterpolationType::Linear,
+                        oversampling_factor: 256,
+                        window: WindowFunction::BlackmanHarris2,
                     };
-
-                    // Emit event to frontend
-                    // This sends audio-data event that JS listens for
-                    if let Err(e) = window.emit("audio-data", &payload) {
-                        eprintln!("Failed to emit audio-data event: {}", e);
+                    match SincFixedIn::<f32>::new(ratio, 2.0, params, chunk.len(), 1) {
+                        Ok(mut resampler) => {
+                            match resampler.process(&[chunk], None) {
+                                Ok(out) => f32_mono_to_pcm16(&out[0]),
+                                Err(e) => {
+                                    eprintln!("Resample process error: {e}");
+                                    return;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Resampler init error: {e}");
+                            return;
+                        }
                     }
+                };
+
+                if ws_tx.send(pcm_bytes).is_err() {
+                    eprintln!("WS sender closed; stopping audio flush");
                 }
             },
         )
-        .map_err(|e| format!("Failed to build stream: {}", e))?;
+        .map_err(|e| format!("Failed to build stream: {e}"))?;
 
-        // ====================================================================
-        // STEP 5: Start the stream
-        // ====================================================================
-        // This tells CPAL to begin capturing audio
-        stream.play()
-            .map_err(|e| format!("Failed to play stream: {}", e))?;
+        stream.play().map_err(|e| format!("Failed to start stream: {e}"))?;
 
-        // ====================================================================
-        // STEP 6: Store stream in state to keep it alive
-        // ====================================================================
-        // CRITICAL: The stream MUST be kept alive, otherwise it will be
-        // dropped and audio capture will immediately stop.
-        // We store it in Arc<Mutex<Option<Stream>>> for thread safety.
-        {
-            let mut s = self.stream.lock().unwrap();
-            *s = Some(stream);
-        }
+        *self.stream.lock().unwrap() = Some(stream);
+        *self.config.lock().unwrap() = Some(config);
+        *self.state.lock().unwrap() = RecordingState::Recording;
 
-        // ====================================================================
-        // STEP 7: Store device config
-        // ====================================================================
-        {
-            let mut c = self.config.lock().unwrap();
-            *c = Some(config);
-        }
-
-        // ====================================================================
-        // STEP 8: Update state to Recording
-        // ====================================================================
-        {
-            let mut st = self.state.lock().unwrap();
-            *st = RecordingState::Recording;
-        }
-
-        println!("Recording started from device {}", device_id);
-        Ok(format!("Successfully started capturing from device {}", device_id))
+        println!("Recording started (WS) from device {device_id} @ {native_sr}Hz");
+        Ok(format!("Started capturing from device {device_id}"))
     }
 
     // ========================================================================
-    // RECORDING STOP
+    // STOP
     // ========================================================================
 
-    /// Stop capturing audio
-    ///
-    /// # Returns
-    /// Ok(message) on success
-    /// Err(reason) if not currently recording
-    ///
-    /// # What it does
-    /// 1. Checks if currently recording
-    /// 2. Drops the stream from state
-    /// 3. CPAL automatically stops audio capture
-    /// 4. Callback stops being called
-    /// 5. No more events emitted to frontend
-    /// 6. Updates state to Stopped
-    ///
-    /// # Example
-    /// ```rust
-    /// audio_capture.stop()?;
-    /// println!("Recording stopped");
-    /// ```
+    /// Stop capturing audio. Dropping the stream causes CPAL to stop the callback.
     pub fn stop(&self) -> Result<String, String> {
-        // ====================================================================
-        // STEP 1: Verify we're recording
-        // ====================================================================
         if !self.is_recording() {
             return Err("Not currently recording".to_string());
         }
 
-        // ====================================================================
-        // STEP 2: Drop the stream
-        // ====================================================================
-        // Setting to None drops the stream, which CPAL automatically stops.
-        // Once dropped, the callback is never called again.
-        {
-            let mut s = self.stream.lock().unwrap();
-            *s = None;
-        }
-
-        // ====================================================================
-        // STEP 3: Clear device config
-        // ====================================================================
-        {
-            let mut c = self.config.lock().unwrap();
-            *c = None;
-        }
-
-        // ====================================================================
-        // STEP 4: Update state to Stopped
-        // ====================================================================
-        {
-            let mut st = self.state.lock().unwrap();
-            *st = RecordingState::Stopped;
-        }
+        *self.stream.lock().unwrap() = None;
+        *self.config.lock().unwrap() = None;
+        *self.state.lock().unwrap() = RecordingState::Stopped;
 
         println!("Recording stopped");
         Ok("Audio capture stopped".to_string())
     }
 }
-
-// ============================================================================
-// USAGE EXAMPLE
-// ============================================================================
-//
-// In main.rs:
-//
-// let window = app.get_webview_window("main")?;
-// let audio_capture = AudioCapture::new(window);
-//
-// From frontend:
-//
-// // Get devices
-// const devices = await invoke('get_audio_devices');
-// // → calls: audio_capture.get_devices()
-//
-// // Start recording
-// await invoke('start_audio_capture', { deviceId: "0" });
-// // → calls: audio_capture.start("0")
-//
-// // Listen for audio events
-// listen('audio-data', (event) => {
-//     const data = event.payload;  // AudioData struct
-//     drawWaveform(data.data);
-// });
-//
-// // Stop recording
-// await invoke('stop_audio_capture');
-// // → calls: audio_capture.stop()
-//
-// ============================================================================
-// LIFECYCLE DIAGRAM
-// ============================================================================
-//
-// Creation (new)
-//   ↓
-//   state = Stopped
-//   stream = None
-//   config = None
-//   ↓
-// Frontend calls start_audio_capture
-//   ↓
-// start(device_id)
-//   1. Parse device_id: "0" → 0
-//   2. Get config from AudioEngine
-//   3. Build stream with callback
-//   4. stream.play() starts capture
-//   5. Store stream in Arc<Mutex<>>
-//   6. state = Recording
-//   7. Callback fires 100+ times/sec
-//   ↓
-// Frontend listens to 'audio-data' events
-// Callback emits 1024 samples each time
-//   ↓
-// Frontend calls stop_audio_capture
-//   ↓
-// stop()
-//   1. Check is_recording() = true
-//   2. Drop stream (= None)
-//   3. CPAL stops capture automatically
-//   4. Callback stops firing
-//   5. state = Stopped
-//   ↓
-// Can call start() again anytime
-//
-// ===========================================================================
