@@ -7,19 +7,6 @@ use tauri::Emitter;
 use tauri::WebviewWindow;
 
 // ============================================================================
-// AUDIO DATA STRUCTURE
-// ============================================================================
-
-/// Audio data payload sent to frontend for waveform visualization
-#[derive(Serialize, Clone)]
-pub struct AudioData {
-    pub sample_rate: u32,
-    pub channels: u16,
-    pub data: Vec<f32>,
-    pub timestamp: u64,
-}
-
-// ============================================================================
 // RECORDING STATE ENUM
 // ============================================================================
 

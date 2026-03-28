@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, Depends, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from sqlmodel import Session
 from fastapi.middleware.cors import CORSMiddleware
+import json
 
 from database.db import get_session
 from models.schemas import CreateSessionCommand, UpdateSessionCommand
@@ -61,20 +61,15 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str):
       - Server sends:  {"type": "transcription", "text": "..."} or {"type": "error", "message": "..."}
     """
     await websocket.accept()
-
-    # Validate session exists
-    from database.db import engine
-    from sqlmodel import Session as DBSession, select
-    from models.models import SessionModel
-    with DBSession(engine) as db:
-        session_obj = db.exec(select(SessionModel).where(SessionModel.session_id == session_id)).first()
-        if not session_obj:
-            await websocket.send_json({"type": "error", "message": f"Session {session_id} not found"})
-            await websocket.close(code=4004)
-            return
-
-    accumulated_transcript = session_obj.transcript or ""
-
+    session_obj = await get_session_info_query(session_id, db)
+    if not session_obj or session_obj['error']:
+        await websocket.send_json({"type": "error", "message": f"Session {session_id} not found"})
+        await websocket.close(code=4004)
+        return
+    
+    # Read transcript while session_obj is still in scope (within the DB session)
+    accumulated_transcript = session_obj['session']['transcript'] or ""
+    
     try:
         while True:
             message = await websocket.receive()
@@ -88,24 +83,15 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str):
                     # Append to running transcript
                     accumulated_transcript = (accumulated_transcript.rstrip() + " " + text).strip()
 
-                    # Persist incrementally
-                    from database.db import engine
-                    from sqlmodel import Session as DBSession
-                    with DBSession(engine) as db:
-                        obj = db.get(SessionModel, session_id)
-                        if obj:
-                            obj.transcript = accumulated_transcript
-                            db.add(obj)
-                            db.commit()
+                    # Persist incrementally to DB
+                    await update_session_command(session_id, db, accumulated_transcript, "", "active")
 
                     await websocket.send_json({"type": "transcription", "text": text})
 
             elif "text" in message and message["text"]:
-                import json
                 try:
                     data = json.loads(message["text"])
                     if data.get("type") == "generate_summary":
-                        # Forward to STT summary endpoint or handle here
                         await websocket.send_json({"type": "info", "message": "Summary generation not yet implemented over WebSocket"})
                 except Exception:
                     await websocket.send_json({"type": "error", "message": "Invalid JSON command"})

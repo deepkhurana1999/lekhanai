@@ -70,7 +70,6 @@ async fn start_recording(
     }
 
     // Spawn task: drain pcm_rx → WebSocket binary frames
-    let app_handle_send = app.clone();
     tokio::spawn(async move {
         while let Some(pcm_chunk) = pcm_rx.recv().await {
             if let Err(e) = ws_write.send(Message::Binary(pcm_chunk)).await {

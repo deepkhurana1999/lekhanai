@@ -1,15 +1,12 @@
 import os
 import io
 import httpx
-import struct
 import numpy as np
 import soundfile as sf
 import librosa
 from fastapi import UploadFile, File
 
 STT_BASE_URL = os.getenv("STT_BASE_URL", "")
-if not STT_BASE_URL or len(STT_BASE_URL) == 0:
-    raise ValueError("STT_BASE_URL environment variable is not set")
 
 # Chunk parameters
 SAMPLE_RATE = 16000
@@ -68,6 +65,9 @@ async def proxy_transcribe_audio(file: UploadFile = File(...)):
     4. Deduplicate overlap boundaries between chunks
     5. Return concatenated transcript
     """
+    if not STT_BASE_URL:
+        raise RuntimeError("STT_BASE_URL environment variable is not set")
+
     try:
         audio_bytes = await file.read()
 

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <cstring>
 #include "server/http/server.hpp"
 #include "processors/request.processor.hpp"
 #include "processors/audio.processor/vad.audio.processor.hpp"
@@ -168,16 +169,27 @@ namespace lekhanai
             }
 
             // Convert int16 PCM -> float32 [-1, 1]
+            // Use memcpy to read each int16 safely (avoids alignment assumptions on std::string storage)
             const size_t sample_count = body.size() / 2;
-            const int16_t *pcm = reinterpret_cast<const int16_t *>(body.data());
             std::vector<float> audio(sample_count);
             constexpr float norm = 1.0f / 32768.0f;
             for (size_t i = 0; i < sample_count; ++i)
-                audio[i] = static_cast<float>(pcm[i]) * norm;
+            {
+                int16_t sample;
+                std::memcpy(&sample, body.data() + i * 2, 2);
+                audio[i] = static_cast<float>(sample) * norm;
+            }
 
             // VAD -> speech segments
             VADState vad_state;
             auto segments = request_processor->getSpeechSegments(audio, vad_state);
+
+            // Short-circuit: no speech detected in this chunk
+            if (segments.empty())
+            {
+                res.body() = "{\"text\":\"\"}";
+                return;
+            }
 
             // Whisper transcription
             std::vector<std::string> transcriptions = request_processor->getVoiceTranscriptions(segments, audio);
