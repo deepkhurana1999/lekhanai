@@ -38,11 +38,16 @@ fn get_input_devices(
 /// * `device_id`   - Device ID from get_input_devices (numeric string index)
 /// * `session_id`  - Session ID created beforehand via POST /api/v1/session/create
 /// * `manager_url` - Manager base URL, e.g. "ws://localhost:5000"
+/// * `include_system_audio` - When true, also capture system/loopback audio
+///   (via pw-record) and interleave it with the mic stream based on which
+///   source has signal; see `AudioCapture::start_with_ws`. Optional, defaults
+///   to false, so existing callers that don't pass it keep working mic-only.
 #[tauri::command]
 async fn start_recording(
     device_id: String,
     session_id: String,
     manager_url: String,
+    include_system_audio: Option<bool>,
     state: State<'_, AppState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -105,7 +110,7 @@ async fn start_recording(
     });
 
     // Start CPAL mic capture; audio callback sends PCM chunks down pcm_tx
-    state.audio_capture.start_with_ws(device_id, pcm_tx)
+    state.audio_capture.start_with_ws(device_id, pcm_tx, include_system_audio.unwrap_or(false))
 }
 
 /// Pause the active recording without closing the Manager WebSocket or

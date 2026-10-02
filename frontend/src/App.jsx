@@ -30,6 +30,7 @@ function App() {
   const [selectedMicrophone, setSelectedMicrophone] = useState(null);
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState(null);
   const [showMicModal, setShowMicModal] = useState(false);
+  const [includeSystemAudio, setIncludeSystemAudio] = useState(false);
 
   // Recording state
   const [currentTranscript, setCurrentTranscript] = useState("");
@@ -153,8 +154,10 @@ function App() {
       if (transcriptionUnlistenRef.current) transcriptionUnlistenRef.current();
       transcriptionUnlistenRef.current = await listen("transcription", (event) => {
         const text = event.payload?.text;
+        const source = event.payload?.source;
         if (text) {
-          setCurrentTranscript(prev => prev ? prev.trimEnd() + " " + text : text);
+          const label = source === "system" ? "System: " : source === "mic" ? "You: " : "";
+          setCurrentTranscript(prev => prev ? prev.trimEnd() + "\n" + label + text : label + text);
         }
       });
 
@@ -163,6 +166,7 @@ function App() {
         deviceId: selectedMicrophoneId ?? "0",
         sessionId: session_id,
         managerUrl: MANAGER_WS_URL,
+        includeSystemAudio,
       });
     } catch (error) {
       console.error("Failed to start recording:", error);
@@ -563,6 +567,14 @@ function App() {
                 ))}
               </ul>
             )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={includeSystemAudio}
+                onChange={(e) => setIncludeSystemAudio(e.target.checked)}
+              />
+              Include system audio (other side of calls, media playback)
+            </label>
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
               <button
                 className="btn-primary"

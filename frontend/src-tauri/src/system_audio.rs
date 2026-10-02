@@ -87,7 +87,7 @@ impl SystemAudioCapture {
 
     /// Reader loop: reads raw f32 LE bytes from pw-record stdout and decodes into sample_buf.
     /// Maintains a leftover-bytes buffer to handle floats split across read() boundaries.
-    fn reader_loop(mut stdout: std::process::ChildStdout, buf: Arc<Mutex<Vec<f32>>>) {
+    fn reader_loop<R: Read>(mut stdout: R, buf: Arc<Mutex<Vec<f32>>>) {
         let mut byte_buf = [0u8; 4096];
         let mut leftover = Vec::with_capacity(3); // Can hold 0-3 remaining bytes from previous read
 
@@ -280,7 +280,7 @@ mod tests {
 
         // Run reader_loop with the split reader
         let buf = Arc::new(Mutex::new(Vec::new()));
-        Self::reader_loop(reader, buf.clone());
+        SystemAudioCapture::reader_loop(reader, buf.clone());
 
         // Verify the float was decoded correctly despite the split
         let decoded = buf.lock().unwrap();

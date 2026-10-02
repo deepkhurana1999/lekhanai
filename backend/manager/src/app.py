@@ -17,6 +17,11 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
+    # http://localhost:1420 is only the Vite dev server. The packaged Tauri
+    # app (AppImage/.deb/.rpm) serves its UI from tauri://localhost instead,
+    # which the default allowlist rejected with "Disallowed CORS origin" on
+    # every request, including the CreateSession preflight the app makes on
+    # every "start recording" click.
     allow_origins=["http://localhost:1420", "tauri://localhost"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -57,9 +62,11 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str, db: Sessio
     WebSocket bridge: Tauri client → Manager → STT /api/v1/process.
 
     Protocol:
-      - Binary frames: raw PCM int16 audio chunks (16kHz mono)
+      - Binary frames: [1 source tag byte][raw PCM int16 audio bytes] (16kHz mono).
+                       Tag byte: 0x00 = mic, 0x01 = system audio.
       - Text frames:   JSON commands, e.g. {"type": "generate_summary", "text": "..."}
-      - Server sends:  {"type": "transcription", "text": "..."} or {"type": "error", "message": "..."}
+      - Server sends:  {"type": "transcription", "text": "...", "source": "mic"|"system"}
+                       or {"type": "error", "message": "..."}
     """
     await websocket.accept()
     session_obj = get_session_info_query(session_id, db)
@@ -67,27 +74,39 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str, db: Sessio
         await websocket.send_json({"type": "error", "message": f"Session {session_id} not found"})
         await websocket.close(code=4004)
         return
-    
+
     # Read transcript while session_obj is still in scope (within the DB session)
     accumulated_transcript = session_obj['session']['transcript'] or ""
-    
+    last_source = None
+
     try:
         while True:
             message = await websocket.receive()
 
             if "bytes" in message and message["bytes"]:
-                # Binary: raw PCM int16 chunk from Tauri
-                pcm_bytes = message["bytes"]
+                # Binary: [1 tag byte][raw PCM int16 chunk] from Tauri
+                frame = message["bytes"]
+                source = "system" if frame[0] == 1 else "mic"
+                pcm_bytes = frame[1:]
                 text = await realtime_transcribe_chunk(pcm_bytes)
 
                 if text:
+                    # Prefix with a speaker label only when the source changes,
+                    # so a continuous run from the same source isn't relabeled
+                    # on every chunk.
+                    labeled_text = text
+                    if source != last_source:
+                        label = "[System] " if source == "system" else "[You] "
+                        labeled_text = label + text
+                        last_source = source
+
                     # Append to running transcript
-                    accumulated_transcript = (accumulated_transcript.rstrip() + " " + text).strip()
+                    accumulated_transcript = (accumulated_transcript.rstrip() + " " + labeled_text).strip()
 
                     # Persist incrementally to DB
                     update_session_command(session_id, db, accumulated_transcript, "", "active")
 
-                    await websocket.send_json({"type": "transcription", "text": text})
+                    await websocket.send_json({"type": "transcription", "text": text, "source": source})
 
             elif "text" in message and message["text"]:
                 try:

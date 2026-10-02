@@ -3,8 +3,24 @@ use serde::Serialize;
 use cpal::Stream;
 use cpal::traits::StreamTrait;
 use crate::audio_engine::{AudioEngine, AudioDevice, DeviceConfig};
+use crate::system_audio::SystemAudioCapture;
 use tauri::Emitter;
 use tauri::WebviewWindow;
+
+/// Fixed native sample rate `pw-record` captures system audio at (see system_audio.rs).
+const SYSTEM_AUDIO_SAMPLE_RATE: u32 = 48000;
+
+/// How much louder (as a multiplier on RMS) system audio must be than the mic
+/// before we prefer it over the mic chunk. A margin >1.0 avoids flapping
+/// between sources on comparably-quiet signals/noise.
+const SYSTEM_AUDIO_RMS_MARGIN: f32 = 1.2;
+
+/// Minimum fraction of the expected (mic-duration-equivalent) sample count a
+/// system-audio chunk must have before it's even considered as a candidate.
+/// Guards against a just-restarted `pw-record` (e.g. right after resume)
+/// producing a tiny sliver of samples that could otherwise win the RMS
+/// comparison and wipe out a full mic chunk's worth of real speech.
+const SYSTEM_AUDIO_MIN_FILL_RATIO: f32 = 0.8;
 
 // ============================================================================
 // RECORDING STATE ENUM
@@ -23,11 +39,18 @@ pub enum RecordingState {
 // ============================================================================
 
 pub struct AudioCapture {
-    /// Active CPAL audio stream — kept alive in Arc<Mutex<>> 
+    /// Active CPAL audio stream — kept alive in Arc<Mutex<>>
     stream: Arc<Mutex<Option<Stream>>>,
     state: Arc<Mutex<RecordingState>>,
     config: Arc<Mutex<Option<DeviceConfig>>>,
     window: WebviewWindow,
+    /// Active system-audio (loopback) capture, if enabled for this session.
+    system_audio: Arc<Mutex<Option<SystemAudioCapture>>>,
+    /// Whether system audio was requested for the current recording session.
+    /// Tracked separately from `system_audio` being `Some` because the
+    /// subprocess may fail to spawn (or get stopped on pause) while the
+    /// session still wants it restarted on resume.
+    include_system_audio: Arc<Mutex<bool>>,
 }
 
 // ============================================================================
@@ -45,6 +68,66 @@ pub fn f32_mono_to_pcm16(samples: &[f32]) -> Vec<u8> {
     out
 }
 
+/// Root-mean-square amplitude of a mono f32 sample buffer. Used to compare
+/// loudness between the mic chunk and the equivalent-duration system-audio
+/// chunk so the flush step can pick whichever source actually has signal.
+pub fn rms(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    let sum_sq: f32 = samples.iter().map(|s| s * s).sum();
+    (sum_sq / samples.len() as f32).sqrt()
+}
+
+/// Prefix PCM bytes with a single source tag byte: `0x00` = mic, `0x01` = system audio.
+fn tag_pcm_bytes(tag: u8, pcm_bytes: Vec<u8>) -> Vec<u8> {
+    let mut tagged = Vec::with_capacity(pcm_bytes.len() + 1);
+    tagged.push(tag);
+    tagged.extend(pcm_bytes);
+    tagged
+}
+
+/// Resample a mono f32 chunk from `native_sr` to `target_sr` (if needed) and
+/// convert the result to int16 PCM bytes. Returns `None` on resampler failure
+/// (already logged internally via eprintln before returning).
+fn resample_and_pcm16(chunk: Vec<f32>, native_sr: u32, target_sr: u32) -> Option<Vec<u8>> {
+    if native_sr == target_sr {
+        return Some(f32_mono_to_pcm16(&chunk));
+    }
+    if chunk.is_empty() {
+        return Some(Vec::new());
+    }
+
+    use rubato::{
+        Resampler, SincFixedIn, SincInterpolationParameters,
+        SincInterpolationType, WindowFunction,
+    };
+
+    let ratio = target_sr as f64 / native_sr as f64;
+    let params = SincInterpolationParameters {
+        sinc_len: 256,
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
+        oversampling_factor: 256,
+        window: WindowFunction::BlackmanHarris2,
+    };
+    let chunk_len = chunk.len();
+    let mut resampler = match SincFixedIn::<f32>::new(ratio, 2.0, params, chunk_len, 1) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Resampler init error: {e}");
+            return None;
+        }
+    };
+    match resampler.process(&[chunk], None) {
+        Ok(out) => Some(f32_mono_to_pcm16(&out[0])),
+        Err(e) => {
+            eprintln!("Resample process error: {e}");
+            None
+        }
+    }
+}
+
 // ============================================================================
 // IMPLEMENTATION
 // ============================================================================
@@ -56,6 +139,8 @@ impl AudioCapture {
             state: Arc::new(Mutex::new(RecordingState::Stopped)),
             config: Arc::new(Mutex::new(None)),
             window,
+            system_audio: Arc::new(Mutex::new(None)),
+            include_system_audio: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -83,19 +168,17 @@ impl AudioCapture {
     ///
     /// Audio pipeline per CPAL callback invocation:
     ///   native samples → mix to mono f32 → accumulate 5s buffer
-    ///   → resample to 16kHz (if needed) → int16 PCM bytes → ws_sender channel
+    ///   → compare RMS against an equivalent system-audio chunk (if enabled)
+    ///   → resample the chosen source to 16kHz (if needed) → int16 PCM bytes
+    ///   → tag with source byte → ws_sender channel
     ///
     /// Also emits `audio-data` events for waveform visualization in React.
     pub fn start_with_ws(
         &self,
         device_id: String,
         ws_sender: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
+        include_system_audio: bool,
     ) -> Result<String, String> {
-        use rubato::{
-            Resampler, SincFixedIn, SincInterpolationParameters,
-            SincInterpolationType, WindowFunction,
-        };
-
         if self.is_recording() {
             return Err("Already recording".to_string());
         }
@@ -112,9 +195,12 @@ impl AudioCapture {
         let sample_buf: Arc<Mutex<Vec<f32>>> =
             Arc::new(Mutex::new(Vec::with_capacity(buffer_cap)));
 
+        *self.include_system_audio.lock().unwrap() = include_system_audio;
+
         let buf_clone = sample_buf.clone();
         let ws_tx = ws_sender.clone();
         let window = self.window.clone();
+        let system_audio_clone = self.system_audio.clone();
 
         let (stream, config) = AudioEngine::build_stream(
             &device_id,
@@ -146,40 +232,55 @@ impl AudioCapture {
                     return;
                 }
 
-                // --- Flush: resample if needed, convert to int16, send ---
-                let chunk = buf.clone();
+                // --- Flush: pick the louder of mic vs. system audio, resample, tag, send ---
+                let mic_chunk = buf.clone();
                 buf.clear();
                 drop(buf);
 
-                let pcm_bytes = if native_sr == target_sr {
-                    f32_mono_to_pcm16(&chunk)
+                // Pull a chunk from system audio covering the same wall-clock
+                // duration as mic_chunk, scaled for the two sources' sample
+                // rates (mic_chunk's actual length can exceed buffer_cap
+                // slightly since the flush only triggers after the cap is
+                // reached, not exactly at it).
+                let expected_sys_len =
+                    mic_chunk.len() * SYSTEM_AUDIO_SAMPLE_RATE as usize / native_sr as usize;
+                let sys_chunk: Option<Vec<f32>> = system_audio_clone
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .map(|sa| sa.take_buffer(expected_sys_len));
+
+                let mic_rms = rms(&mic_chunk);
+                let use_system_audio = match &sys_chunk {
+                    // Only consider system audio once it's filled to at least
+                    // SYSTEM_AUDIO_MIN_FILL_RATIO of the expected length —
+                    // otherwise a just-restarted pw-record (e.g. right after
+                    // resume) could offer a tiny, misleadingly loud sliver
+                    // that wins the comparison and discards a full mic chunk.
+                    Some(sys)
+                        if sys.len() as f32
+                            >= expected_sys_len as f32 * SYSTEM_AUDIO_MIN_FILL_RATIO =>
+                    {
+                        rms(sys) > mic_rms * SYSTEM_AUDIO_RMS_MARGIN
+                    }
+                    _ => false,
+                };
+
+                let (tag, pcm_bytes) = if use_system_audio {
+                    // Safe: use_system_audio is only true when sys_chunk is Some(non-empty).
+                    let sys = sys_chunk.unwrap();
+                    match resample_and_pcm16(sys, SYSTEM_AUDIO_SAMPLE_RATE, target_sr) {
+                        Some(bytes) => (0x01u8, bytes),
+                        None => return,
+                    }
                 } else {
-                    let ratio = target_sr as f64 / native_sr as f64;
-                    let params = SincInterpolationParameters {
-                        sinc_len: 256,
-                        f_cutoff: 0.95,
-                        interpolation: SincInterpolationType::Linear,
-                        oversampling_factor: 256,
-                        window: WindowFunction::BlackmanHarris2,
-                    };
-                    match SincFixedIn::<f32>::new(ratio, 2.0, params, chunk.len(), 1) {
-                        Ok(mut resampler) => {
-                            match resampler.process(&[chunk], None) {
-                                Ok(out) => f32_mono_to_pcm16(&out[0]),
-                                Err(e) => {
-                                    eprintln!("Resample process error: {e}");
-                                    return;
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("Resampler init error: {e}");
-                            return;
-                        }
+                    match resample_and_pcm16(mic_chunk, native_sr, target_sr) {
+                        Some(bytes) => (0x00u8, bytes),
+                        None => return,
                     }
                 };
 
-                if ws_tx.send(pcm_bytes).is_err() {
+                if ws_tx.send(tag_pcm_bytes(tag, pcm_bytes)).is_err() {
                     eprintln!("WS sender closed; stopping audio flush");
                 }
             },
@@ -191,6 +292,21 @@ impl AudioCapture {
         *self.stream.lock().unwrap() = Some(stream);
         *self.config.lock().unwrap() = Some(config);
         *self.state.lock().unwrap() = RecordingState::Recording;
+
+        if include_system_audio {
+            let sys_audio = SystemAudioCapture::new();
+            match sys_audio.start() {
+                Ok(()) => {
+                    *self.system_audio.lock().unwrap() = Some(sys_audio);
+                    println!("System audio capture enabled for this session");
+                }
+                Err(e) => {
+                    eprintln!(
+                        "System audio capture failed to start, continuing mic-only: {e}"
+                    );
+                }
+            }
+        }
 
         println!("Recording started (WS) from device {device_id} @ {native_sr}Hz");
         Ok(format!("Started capturing from device {device_id}"))
@@ -217,6 +333,16 @@ impl AudioCapture {
         stream.pause().map_err(|e| format!("Failed to pause stream: {e}"))?;
         drop(stream_guard);
 
+        // Best-effort: SystemAudioCapture has no true pause, so we kill the
+        // pw-record subprocess here and respawn it in resume(). Errors are
+        // intentionally ignored — this is a nice-to-have, not a correctness
+        // requirement, and the mic path pauses regardless.
+        if let Some(sys_audio) = self.system_audio.lock().unwrap().take() {
+            if let Err(e) = sys_audio.stop() {
+                eprintln!("Failed to stop system audio during pause (ignored): {e}");
+            }
+        }
+
         *self.state.lock().unwrap() = RecordingState::Paused;
 
         println!("Recording paused");
@@ -233,6 +359,23 @@ impl AudioCapture {
         let stream = stream_guard.as_ref().ok_or("No active stream")?;
         stream.play().map_err(|e| format!("Failed to resume stream: {e}"))?;
         drop(stream_guard);
+
+        // Restart system audio if it was enabled for this session. pw-record
+        // has no true pause/resume, so respawning the subprocess is the
+        // documented approach from Task 1's plan.
+        if *self.include_system_audio.lock().unwrap() {
+            let sys_audio = SystemAudioCapture::new();
+            match sys_audio.start() {
+                Ok(()) => {
+                    *self.system_audio.lock().unwrap() = Some(sys_audio);
+                }
+                Err(e) => {
+                    eprintln!(
+                        "System audio capture failed to restart on resume, continuing mic-only: {e}"
+                    );
+                }
+            }
+        }
 
         *self.state.lock().unwrap() = RecordingState::Recording;
 
@@ -254,9 +397,67 @@ impl AudioCapture {
 
         *self.stream.lock().unwrap() = None;
         *self.config.lock().unwrap() = None;
+
+        if let Some(sys_audio) = self.system_audio.lock().unwrap().take() {
+            if let Err(e) = sys_audio.stop() {
+                eprintln!("Failed to stop system audio during stop (ignored): {e}");
+            }
+        }
+        *self.include_system_audio.lock().unwrap() = false;
+
         *self.state.lock().unwrap() = RecordingState::Stopped;
 
         println!("Recording stopped");
         Ok("Audio capture stopped".to_string())
+    }
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rms_of_silence_is_zero() {
+        assert_eq!(rms(&[0.0, 0.0, 0.0]), 0.0);
+    }
+
+    #[test]
+    fn test_rms_of_empty_is_zero() {
+        assert_eq!(rms(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_rms_known_value() {
+        // RMS of [1.0, -1.0, 1.0, -1.0] is 1.0
+        assert_eq!(rms(&[1.0, -1.0, 1.0, -1.0]), 1.0);
+    }
+
+    #[test]
+    fn test_tag_pcm_bytes_mic() {
+        let tagged = tag_pcm_bytes(0x00, vec![1, 2, 3]);
+        assert_eq!(tagged, vec![0x00, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_tag_pcm_bytes_system_audio() {
+        let tagged = tag_pcm_bytes(0x01, vec![4, 5]);
+        assert_eq!(tagged, vec![0x01, 4, 5]);
+    }
+
+    #[test]
+    fn test_resample_and_pcm16_same_rate_passthrough() {
+        let samples = vec![0.5, -0.5, 0.25];
+        let bytes = resample_and_pcm16(samples.clone(), 16000, 16000).unwrap();
+        assert_eq!(bytes, f32_mono_to_pcm16(&samples));
+    }
+
+    #[test]
+    fn test_resample_and_pcm16_empty_chunk_returns_empty() {
+        let bytes = resample_and_pcm16(Vec::new(), 48000, 16000).unwrap();
+        assert!(bytes.is_empty());
     }
 }
