@@ -58,6 +58,7 @@ impl SystemAudioCapture {
                 "-",
             ])
             .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("Failed to spawn pw-record: {e}"))?;
 
@@ -69,6 +70,19 @@ impl SystemAudioCapture {
                 return Err("Failed to open pw-record stdout".to_string());
             }
         };
+
+        // Capture stderr on a dedicated thread so a quick/silent exit (e.g.
+        // wrong --target, PipeWire connection refused) is diagnosable instead
+        // of showing up only as a mysterious immediate stdout EOF.
+        if let Some(mut stderr) = child.stderr.take() {
+            std::thread::spawn(move || {
+                let mut err_output = String::new();
+                let _ = stderr.read_to_string(&mut err_output);
+                if !err_output.trim().is_empty() {
+                    eprintln!("pw-record stderr: {}", err_output.trim());
+                }
+            });
+        }
 
         // Store the child process
         *self.child.lock().unwrap() = Some(child);
