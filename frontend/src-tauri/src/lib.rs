@@ -1,5 +1,6 @@
 mod audio_engine;
 mod audio_capture;
+mod system_audio;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 use tauri::Manager;
@@ -107,6 +108,20 @@ async fn start_recording(
     state.audio_capture.start_with_ws(device_id, pcm_tx)
 }
 
+/// Pause the active recording without closing the Manager WebSocket or
+/// ending the session — `ws_sender` stays populated so resume can keep
+/// using the same connection.
+#[tauri::command]
+fn pause_recording(state: State<'_, AppState>) -> Result<String, String> {
+    state.audio_capture.pause()
+}
+
+/// Resume a paused recording on the same WebSocket connection and session.
+#[tauri::command]
+fn resume_recording(state: State<'_, AppState>) -> Result<String, String> {
+    state.audio_capture.resume()
+}
+
 /// Stop the active recording session and close the Manager WebSocket.
 #[tauri::command]
 fn stop_recording(state: State<'_, AppState>) -> Result<String, String> {
@@ -142,6 +157,8 @@ pub fn run() {
             greet,
             get_input_devices,
             start_recording,
+            pause_recording,
+            resume_recording,
             stop_recording,
         ])
         .run(tauri::generate_context!())

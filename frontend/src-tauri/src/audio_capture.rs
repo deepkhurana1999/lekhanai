@@ -14,6 +14,7 @@ use tauri::WebviewWindow;
 pub enum RecordingState {
     Stopped,
     Recording,
+    Paused,
     Error,
 }
 
@@ -99,11 +100,7 @@ impl AudioCapture {
             return Err("Already recording".to_string());
         }
 
-        let device_index: usize = device_id
-            .parse()
-            .map_err(|_| "Invalid device ID".to_string())?;
-
-        let device_config = AudioEngine::get_device_config(device_index)
+        let device_config = AudioEngine::get_device_config(&device_id)
             .map_err(|e| format!("Failed to get device config: {e}"))?;
 
         let native_sr = device_config.sample_rate;
@@ -120,7 +117,7 @@ impl AudioCapture {
         let window = self.window.clone();
 
         let (stream, config) = AudioEngine::build_stream(
-            device_index,
+            &device_id,
             move |data: &[f32], _info: &cpal::InputCallbackInfo| {
                 // --- Mix down to mono ---
                 let mono: Vec<f32> = if native_ch == 1 {
@@ -200,12 +197,58 @@ impl AudioCapture {
     }
 
     // ========================================================================
+    // PAUSE / RESUME
+    // ========================================================================
+
+    /// Pause capturing audio without dropping the stream or WS connection.
+    /// CPAL stops invoking the callback entirely while paused, which also
+    /// stops the WS `send()` inside it — no separate "skip while paused"
+    /// check is needed. Note: any audio already sitting in the callback's
+    /// `sample_buf` at the moment of pause is not flushed or cleared; it
+    /// resumes accumulating on `.play()`, which can produce one slightly-off
+    /// transcription chunk spanning the pause boundary. Acceptable tradeoff.
+    pub fn pause(&self) -> Result<String, String> {
+        if *self.state.lock().unwrap() != RecordingState::Recording {
+            return Err("Not currently recording".to_string());
+        }
+
+        let stream_guard = self.stream.lock().unwrap();
+        let stream = stream_guard.as_ref().ok_or("No active stream")?;
+        stream.pause().map_err(|e| format!("Failed to pause stream: {e}"))?;
+        drop(stream_guard);
+
+        *self.state.lock().unwrap() = RecordingState::Paused;
+
+        println!("Recording paused");
+        Ok("Audio capture paused".to_string())
+    }
+
+    /// Resume a paused recording on the same stream and WS connection.
+    pub fn resume(&self) -> Result<String, String> {
+        if *self.state.lock().unwrap() != RecordingState::Paused {
+            return Err("Not currently paused".to_string());
+        }
+
+        let stream_guard = self.stream.lock().unwrap();
+        let stream = stream_guard.as_ref().ok_or("No active stream")?;
+        stream.play().map_err(|e| format!("Failed to resume stream: {e}"))?;
+        drop(stream_guard);
+
+        *self.state.lock().unwrap() = RecordingState::Recording;
+
+        println!("Recording resumed");
+        Ok("Audio capture resumed".to_string())
+    }
+
+    // ========================================================================
     // STOP
     // ========================================================================
 
     /// Stop capturing audio. Dropping the stream causes CPAL to stop the callback.
+    /// Valid from both Recording and Paused states.
     pub fn stop(&self) -> Result<String, String> {
-        if !self.is_recording() {
+        let current_state = *self.state.lock().unwrap();
+        if current_state != RecordingState::Recording && current_state != RecordingState::Paused {
             return Err("Not currently recording".to_string());
         }
 

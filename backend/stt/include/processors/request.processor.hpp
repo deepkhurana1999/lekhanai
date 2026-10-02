@@ -27,6 +27,7 @@ namespace lekhanai
         VADProcessor *vad_processor;
         VADAudioProcessor *vad_audio_processor;
         SummaryProcessor *summary_processor;
+        int n_processors;
 
         std::string getSummary(const std::string &transcription);
         std::vector<float> getDecodedAudio(const std::string &raw_audio);

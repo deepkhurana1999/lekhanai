@@ -16,6 +16,7 @@ message(STATUS "Project build type: ${CMAKE_BUILD_TYPE}")
 # Whisper.cpp configurations
 # Option to enable GPU support
 option(ENABLE_GPU "Enable GPU acceleration for Whisper" OFF)
+option(ENABLE_SYCL "Enable Intel SYCL acceleration for Whisper" OFF)
 
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "Build whisper tests" FORCE)
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "Build whisper examples" FORCE)
@@ -33,6 +34,22 @@ if(ENABLE_GPU)
 
     # Enable CUDA language
     enable_language(CUDA)
+elseif(ENABLE_SYCL)
+    message(STATUS "Intel SYCL (iGPU) acceleration enabled")
+
+    set(GGML_SYCL ON CACHE BOOL "Enable SYCL support" FORCE)
+    set(GGML_SYCL_TARGET "INTEL" CACHE STRING "SYCL target device" FORCE)
+
+    # whisper.cpp's SYCL backend requires the Intel oneAPI DPC++ compiler for
+    # BOTH languages (ggml's core is C, ggml-sycl is C++) — a mismatched pair
+    # (e.g. icpx for C++ but the system gcc for C) builds without error but
+    # fails at runtime on the first real SYCL kernel dispatch.
+    if(NOT CMAKE_CXX_COMPILER MATCHES "icpx")
+        message(FATAL_ERROR "ENABLE_SYCL requires CMAKE_CXX_COMPILER=icpx (Intel oneAPI DPC++)")
+    endif()
+    if(NOT CMAKE_C_COMPILER MATCHES "icx")
+        message(FATAL_ERROR "ENABLE_SYCL requires CMAKE_C_COMPILER=icx (Intel oneAPI DPC++)")
+    endif()
 else()
     message(STATUS "CPU-only build")
     set(GGML_CUDA OFF CACHE BOOL "Disable CUDA support" FORCE)

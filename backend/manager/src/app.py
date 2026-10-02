@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, Depends, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import Session
 import json
 
 from database.db import get_session
@@ -16,7 +17,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:1420"],
+    allow_origins=["http://localhost:1420", "tauri://localhost"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -51,7 +52,7 @@ def get_sessions(limit: int = Query(10, ge=1, le=100), offset: int = Query(0, ge
     return list_session_query(offset, limit, db)
 
 @app.websocket("/ws/transcribe/{session_id}")
-async def websocket_transcribe(websocket: WebSocket, session_id: str):
+async def websocket_transcribe(websocket: WebSocket, session_id: str, db: Session = Depends(get_session)):
     """
     WebSocket bridge: Tauri client → Manager → STT /api/v1/process.
 
@@ -61,8 +62,8 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str):
       - Server sends:  {"type": "transcription", "text": "..."} or {"type": "error", "message": "..."}
     """
     await websocket.accept()
-    session_obj = await get_session_info_query(session_id, db)
-    if not session_obj or session_obj['error']:
+    session_obj = get_session_info_query(session_id, db)
+    if not session_obj or session_obj.get('error'):
         await websocket.send_json({"type": "error", "message": f"Session {session_id} not found"})
         await websocket.close(code=4004)
         return
@@ -84,7 +85,7 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str):
                     accumulated_transcript = (accumulated_transcript.rstrip() + " " + text).strip()
 
                     # Persist incrementally to DB
-                    await update_session_command(session_id, db, accumulated_transcript, "", "active")
+                    update_session_command(session_id, db, accumulated_transcript, "", "active")
 
                     await websocket.send_json({"type": "transcription", "text": text})
 

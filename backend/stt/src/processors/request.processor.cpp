@@ -33,8 +33,9 @@ namespace lekhanai
         const int min_silence_samples_at_max_speech = sr_per_ms * 98;
 
         // Initialize processors
-        const int n_threads = 4;
-        const int n_processors = 4;
+        const int n_threads = config.n_threads;
+        const int n_processors = config.n_processors;
+        this->n_processors = n_processors;
 
         audio_processor = new AudioProcessor();
 
@@ -148,7 +149,6 @@ namespace lekhanai
             return transcriptions;
         }
 
-        int n_processors = 4;
         int batch_number = -1;
         std::vector<std::vector<std::vector<float>>> batched_audio;
         for (int i = 0; i < speech_segments.size(); ++i)

@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 class SessionModel(SQLModel, table=True):
@@ -8,7 +8,7 @@ class SessionModel(SQLModel, table=True):
     user_id: str
     transcript: str = Field(default="")
     summary: str = Field(default="")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: str = "active"
 
 class SegmentModel(SQLModel, table=True):
