@@ -1,5 +1,6 @@
 mod audio_engine;
 mod audio_capture;
+mod system_audio;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 use tauri::Manager;
@@ -37,11 +38,16 @@ fn get_input_devices(
 /// * `device_id`   - Device ID from get_input_devices (numeric string index)
 /// * `session_id`  - Session ID created beforehand via POST /api/v1/session/create
 /// * `manager_url` - Manager base URL, e.g. "ws://localhost:5000"
+/// * `include_system_audio` - When true, also capture system/loopback audio
+///   (via pw-record) and interleave it with the mic stream based on which
+///   source has signal; see `AudioCapture::start_with_ws`. Optional, defaults
+///   to false, so existing callers that don't pass it keep working mic-only.
 #[tauri::command]
 async fn start_recording(
     device_id: String,
     session_id: String,
     manager_url: String,
+    include_system_audio: Option<bool>,
     state: State<'_, AppState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
@@ -63,18 +69,44 @@ async fn start_recording(
     // Channel: audio thread → WebSocket sender task
     let (pcm_tx, mut pcm_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
 
+    // Channel: WS read task → WS write task, for control frames (currently
+    // just Pong replies) that the read task can't send itself since the
+    // stream is split into separate read/write halves across two tasks.
+    let (ctrl_tx, mut ctrl_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
+
     // Store sender so stop_recording can close it
     {
         let mut sender_lock = state.ws_sender.lock().unwrap();
         *sender_lock = Some(pcm_tx.clone());
     }
 
-    // Spawn task: drain pcm_rx → WebSocket binary frames
+    // Spawn task: drain pcm_rx → WebSocket binary frames, and ctrl_rx → control frames
     tokio::spawn(async move {
-        while let Some(pcm_chunk) = pcm_rx.recv().await {
-            if let Err(e) = ws_write.send(Message::Binary(pcm_chunk)).await {
-                eprintln!("WS send error: {e}");
-                break;
+        let mut ctrl_closed = false;
+        loop {
+            tokio::select! {
+                maybe_chunk = pcm_rx.recv() => {
+                    match maybe_chunk {
+                        Some(pcm_chunk) => {
+                            if let Err(e) = ws_write.send(Message::Binary(pcm_chunk)).await {
+                                eprintln!("WS send error: {e}");
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                maybe_ctrl = ctrl_rx.recv(), if !ctrl_closed => {
+                    match maybe_ctrl {
+                        Some(ctrl_msg) => {
+                            if let Err(e) = ws_write.send(ctrl_msg).await {
+                                eprintln!("WS control send error: {e}");
+                                break;
+                            }
+                        }
+                        None => ctrl_closed = true,
+                    }
+                }
             }
         }
         // Flush and close
@@ -94,6 +126,13 @@ async fn start_recording(
                     }
                 }
                 Ok(Message::Close(_)) => break,
+                // Reply to server keepalive pings — otherwise the server's
+                // WS library (uvicorn/websockets) can treat this connection
+                // as dead after its ping_timeout and close it, even while
+                // actively recording.
+                Ok(Message::Ping(payload)) => {
+                    let _ = ctrl_tx.send(Message::Pong(payload));
+                }
                 Err(e) => {
                     eprintln!("WS recv error: {e}");
                     break;
@@ -104,7 +143,21 @@ async fn start_recording(
     });
 
     // Start CPAL mic capture; audio callback sends PCM chunks down pcm_tx
-    state.audio_capture.start_with_ws(device_id, pcm_tx)
+    state.audio_capture.start_with_ws(device_id, pcm_tx, include_system_audio.unwrap_or(false))
+}
+
+/// Pause the active recording without closing the Manager WebSocket or
+/// ending the session — `ws_sender` stays populated so resume can keep
+/// using the same connection.
+#[tauri::command]
+fn pause_recording(state: State<'_, AppState>) -> Result<String, String> {
+    state.audio_capture.pause()
+}
+
+/// Resume a paused recording on the same WebSocket connection and session.
+#[tauri::command]
+fn resume_recording(state: State<'_, AppState>) -> Result<String, String> {
+    state.audio_capture.resume()
 }
 
 /// Stop the active recording session and close the Manager WebSocket.
@@ -142,6 +195,8 @@ pub fn run() {
             greet,
             get_input_devices,
             start_recording,
+            pause_recording,
+            resume_recording,
             stop_recording,
         ])
         .run(tauri::generate_context!())

@@ -22,13 +22,16 @@ services:
   stt:
     build:
       context: .
-      dockerfile: ./backend/stt/docker/Dockerfile.dev
+      dockerfile: ./backend/stt/docker/Dockerfile.igpu.dev
     container_name: lekhanai-stt
     env_file:
       - ./backend/stt/template.env
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "992" # host GID for the `render` group (owns /dev/dri/renderD128)
     ports:
       - "8080:8080"
-    command: sh -c "cd /app && ./build/stt"
     networks:
       - lekhanai-network
   manager:

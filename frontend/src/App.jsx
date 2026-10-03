@@ -6,6 +6,8 @@ import "./App.css";
 const COMMANDS = {
   GET_INPUT_DEVICES: "get_input_devices",
   START_RECORDING: "start_recording",
+  PAUSE_RECORDING: "pause_recording",
+  RESUME_RECORDING: "resume_recording",
   STOP_RECORDING: "stop_recording",
 };
 
@@ -14,6 +16,7 @@ const MANAGER_WS_URL = "ws://localhost:5000";
 const AppState = {
   IDLE: "idle",
   RECORDING: "recording",
+  PAUSED: "paused",
   VIEWING: "viewing",
   UPLOADING: "uploading"
 }
@@ -27,6 +30,7 @@ function App() {
   const [selectedMicrophone, setSelectedMicrophone] = useState(null);
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState(null);
   const [showMicModal, setShowMicModal] = useState(false);
+  const [includeSystemAudio, setIncludeSystemAudio] = useState(false);
 
   // Recording state
   const [currentTranscript, setCurrentTranscript] = useState("");
@@ -82,9 +86,15 @@ function App() {
     try {
       const devices = await invoke(COMMANDS.GET_INPUT_DEVICES);
       setMicrophones(devices || []);
-      if (devices && devices.length > 0 && !selectedMicrophone) {
-        setSelectedMicrophone(devices[0].name);
-        setSelectedMicrophoneId(devices[0].id);
+      if (devices && devices.length > 0) {
+        // Device indices can shift when a device is hot-plugged (e.g. a USB
+        // headset connected after the last enumeration), so re-resolve the
+        // previously selected device by name rather than trusting its old
+        // id — falling back to the first device if it's no longer present.
+        const stillPresent = devices.find(d => d.name === selectedMicrophone);
+        const chosen = stillPresent || devices[0];
+        setSelectedMicrophone(chosen.name);
+        setSelectedMicrophoneId(chosen.id);
       }
     } catch (error) {
       setMicrophones([]);
@@ -114,8 +124,12 @@ function App() {
     }
   }
 
-  function handleRecordClick() {
-    // Always show microphone selector modal when clicking Record
+  async function handleRecordClick() {
+    // Refresh the device list right before showing the picker — a device
+    // plugged in after app launch (e.g. a USB headset) wouldn't otherwise
+    // be reflected until the next full reload, and its enumeration index
+    // could have shifted relative to whatever was loaded at mount time.
+    await loadMicrophones();
     setShowMicModal(true);
   }
 
@@ -140,8 +154,10 @@ function App() {
       if (transcriptionUnlistenRef.current) transcriptionUnlistenRef.current();
       transcriptionUnlistenRef.current = await listen("transcription", (event) => {
         const text = event.payload?.text;
+        const source = event.payload?.source;
         if (text) {
-          setCurrentTranscript(prev => prev ? prev.trimEnd() + " " + text : text);
+          const label = source === "system" ? "System: " : source === "mic" ? "You: " : "";
+          setCurrentTranscript(prev => prev ? prev.trimEnd() + "\n" + label + text : label + text);
         }
       });
 
@@ -150,10 +166,29 @@ function App() {
         deviceId: selectedMicrophoneId ?? "0",
         sessionId: session_id,
         managerUrl: MANAGER_WS_URL,
+        includeSystemAudio,
       });
     } catch (error) {
       console.error("Failed to start recording:", error);
       setCurrentTranscript("Error starting recording: " + error);
+    }
+  }
+
+  async function pauseRecording() {
+    try {
+      await invoke(COMMANDS.PAUSE_RECORDING);
+      setAppState(AppState.PAUSED);
+    } catch (error) {
+      console.error("Failed to pause recording:", error);
+    }
+  }
+
+  async function resumeRecording() {
+    try {
+      await invoke(COMMANDS.RESUME_RECORDING);
+      setAppState(AppState.RECORDING);
+    } catch (error) {
+      console.error("Failed to resume recording:", error);
     }
   }
 
@@ -251,6 +286,7 @@ function App() {
 
   // Determine what to display
   let displayContent, primaryActionText, primaryActionHandler, showSecondaryAction;
+  let secondaryButtonText = null, secondaryButtonHandler = null;
 
   if (appState === AppState.IDLE) {
     displayContent = <div className="empty-state">Start your first transcription</div>;
@@ -263,8 +299,21 @@ function App() {
         {currentTranscript || "Listening..."}
       </div>
     );
-    primaryActionText = "Stop";
-    primaryActionHandler = handleStopRecording;
+    primaryActionText = "Pause";
+    primaryActionHandler = pauseRecording;
+    secondaryButtonText = "Stop";
+    secondaryButtonHandler = handleStopRecording;
+    showSecondaryAction = false;
+  } else if (appState === AppState.PAUSED) {
+    displayContent = (
+      <div className="transcription-text">
+        {currentTranscript || "Paused"}
+      </div>
+    );
+    primaryActionText = "Resume";
+    primaryActionHandler = resumeRecording;
+    secondaryButtonText = "Stop";
+    secondaryButtonHandler = handleStopRecording;
     showSecondaryAction = false;
   } else if (appState === AppState.VIEWING && selectedSession) {
     const sessionDate = selectedSession.created_at.toLocaleString('en-US', {
@@ -379,8 +428,10 @@ function App() {
           </button>
         </div>
         <div className="header-right">
-          {appState === AppState.RECORDING && <span className="timer">{formatTime(elapsedTime)}</span>}
-          <div className={`status-dot ${appState === AppState.RECORDING ? AppState.RECORDING : ""}`}></div>
+          {(appState === AppState.RECORDING || appState === AppState.PAUSED) && (
+            <span className="timer">{formatTime(elapsedTime)}</span>
+          )}
+          <div className={`status-dot ${appState === AppState.RECORDING || appState === AppState.PAUSED ? appState : ""}`}></div>
         </div>
       </header>
 
@@ -394,11 +445,16 @@ function App() {
       {/* Primary Action */}
       <div className="primary-action">
         <button
-          className={`btn-primary ${appState === AppState.RECORDING ? AppState.RECORDING : ""}`}
+          className={`btn-primary ${appState === AppState.RECORDING || appState === AppState.PAUSED ? appState : ""}`}
           onClick={primaryActionHandler}
         >
           {primaryActionText}
         </button>
+        {secondaryButtonText && (
+          <button className="btn-secondary" onClick={secondaryButtonHandler}>
+            {secondaryButtonText}
+          </button>
+        )}
         {showSecondaryAction && (
           <>
             <label className="secondary-link" htmlFor="audio-upload-input" style={{ cursor: "pointer" }}>
@@ -511,6 +567,14 @@ function App() {
                 ))}
               </ul>
             )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={includeSystemAudio}
+                onChange={(e) => setIncludeSystemAudio(e.target.checked)}
+              />
+              Include system audio (other side of calls, media playback)
+            </label>
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
               <button
                 className="btn-primary"

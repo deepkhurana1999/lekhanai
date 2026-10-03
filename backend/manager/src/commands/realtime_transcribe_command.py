@@ -22,6 +22,8 @@ async def realtime_transcribe_chunk(pcm_bytes: bytes) -> str:
                 headers={"Content-Type": "application/octet-stream"},
                 timeout=60.0,
             )
+            if resp.status_code >= 400:
+                print(f"realtime_transcribe_chunk: STT {resp.status_code} body={resp.text!r} (sent {len(pcm_bytes)} bytes)")
             resp.raise_for_status()
             data = resp.json()
             text = data.get("text", "").strip()

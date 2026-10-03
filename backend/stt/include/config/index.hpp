@@ -12,6 +12,8 @@ namespace lekhanai
         std::string llm_model;
         std::string llm_server_url;
         std::string llm_model_provider;
+        int n_threads;
+        int n_processors;
     };
 
     class Environment
@@ -21,6 +23,7 @@ namespace lekhanai
 
     private:
         static std::string get(const std::string &key);
+        static int getPositiveInt(const std::string &key);
         static Config config;
         static bool initialized;
     };

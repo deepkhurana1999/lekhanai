@@ -22,6 +22,8 @@ namespace lekhanai
         config.llm_model = get("LLM_MODEL");
         config.llm_server_url = get("LLM_SERVER_URL");
         config.llm_model_provider = get("LLM_MODEL_PROVIDER");
+        config.n_threads = getPositiveInt("N_THREADS");
+        config.n_processors = getPositiveInt("N_PROCESSORS");
         return config;
     }
 
@@ -33,5 +35,29 @@ namespace lekhanai
             throw std::runtime_error("Environment variable not found");
         }
         return std::string(value);
+    }
+
+    int Environment::getPositiveInt(const std::string &key)
+    {
+        const std::string raw = get(key);
+        int value;
+        try
+        {
+            size_t pos;
+            value = std::stoi(raw, &pos);
+            if (pos != raw.size())
+            {
+                throw std::invalid_argument("trailing characters");
+            }
+        }
+        catch (const std::exception &)
+        {
+            throw std::runtime_error(key + " must be a valid integer, got: " + raw);
+        }
+        if (value <= 0)
+        {
+            throw std::runtime_error(key + " must be a positive integer, got: " + raw);
+        }
+        return value;
     }
 }
