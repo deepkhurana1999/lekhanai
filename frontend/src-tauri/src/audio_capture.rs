@@ -11,9 +11,18 @@ use tauri::WebviewWindow;
 const SYSTEM_AUDIO_SAMPLE_RATE: u32 = 48000;
 
 /// How much louder (as a multiplier on RMS) system audio must be than the mic
-/// before we prefer it over the mic chunk. A margin >1.0 avoids flapping
-/// between sources on comparably-quiet signals/noise.
-const SYSTEM_AUDIO_RMS_MARGIN: f32 = 1.2;
+/// before we prefer it over the mic chunk.
+///
+/// This is deliberately well below 1.0: a `pw-record` loopback tap's absolute
+/// RMS can be much quieter than an acoustic mic's ambient noise floor even at
+/// full system volume (measured ~0.003-0.008 RMS for a PipeWire monitor vs.
+/// a mic's typical ~0.001-0.01 ambient floor on real hardware) — these two
+/// signals aren't on a comparable absolute scale, so a margin >1.0 (requiring
+/// system audio to be literally louder than the mic) would almost never let
+/// system audio win. 0.4 lets a present-but-quiet system signal beat mic
+/// ambient noise, while actual mic speech (RMS typically 0.02+) still easily
+/// outweighs it.
+const SYSTEM_AUDIO_RMS_MARGIN: f32 = 0.4;
 
 /// Minimum fraction of the expected (mic-duration-equivalent) sample count a
 /// system-audio chunk must have before it's even considered as a candidate.
