@@ -89,8 +89,9 @@ impl SystemAudioCapture {
 
         // Spawn reader thread
         let buf = self.sample_buf.clone();
+        let child_for_status = self.child.clone();
         let reader_handle = std::thread::spawn(move || {
-            Self::reader_loop(stdout, buf);
+            Self::reader_loop(stdout, buf, Some(child_for_status));
         });
 
         *self.reader_thread.lock().unwrap() = Some(reader_handle);
@@ -101,9 +102,17 @@ impl SystemAudioCapture {
 
     /// Reader loop: reads raw f32 LE bytes from pw-record stdout and decodes into sample_buf.
     /// Maintains a leftover-bytes buffer to handle floats split across read() boundaries.
-    fn reader_loop<R: Read>(mut stdout: R, buf: Arc<Mutex<Vec<f32>>>) {
+    /// `child_for_status` (when provided — real usage, not the unit tests) lets EOF handling
+    /// report pw-record's actual exit status, since a silently-killed or zero-exit process
+    /// often prints nothing to stderr.
+    fn reader_loop<R: Read>(
+        mut stdout: R,
+        buf: Arc<Mutex<Vec<f32>>>,
+        child_for_status: Option<Arc<Mutex<Option<std::process::Child>>>>,
+    ) {
         let mut byte_buf = [0u8; 4096];
         let mut leftover = Vec::with_capacity(3); // Can hold 0-3 remaining bytes from previous read
+        let mut total_bytes_read: usize = 0;
 
         loop {
             match stdout.read(&mut byte_buf) {
@@ -115,10 +124,31 @@ impl SystemAudioCapture {
                             leftover.len()
                         );
                     }
-                    println!("System audio reader: EOF reached");
+                    println!(
+                        "System audio reader: EOF reached (total {} bytes read over this capture)",
+                        total_bytes_read
+                    );
+                    if let Some(child_arc) = &child_for_status {
+                        if let Some(child) = child_arc.lock().unwrap().as_mut() {
+                            match child.try_wait() {
+                                Ok(Some(status)) => {
+                                    eprintln!("pw-record exited with status: {status}");
+                                }
+                                Ok(None) => {
+                                    eprintln!(
+                                        "pw-record still running despite stdout EOF (status: still alive)"
+                                    );
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to query pw-record exit status: {e}");
+                                }
+                            }
+                        }
+                    }
                     break;
                 }
                 Ok(n) => {
+                    total_bytes_read += n;
                     // Combine leftover bytes from previous read with new bytes
                     leftover.extend_from_slice(&byte_buf[..n]);
 
@@ -294,7 +324,7 @@ mod tests {
 
         // Run reader_loop with the split reader
         let buf = Arc::new(Mutex::new(Vec::new()));
-        SystemAudioCapture::reader_loop(reader, buf.clone());
+        SystemAudioCapture::reader_loop(reader, buf.clone(), None);
 
         // Verify the float was decoded correctly despite the split
         let decoded = buf.lock().unwrap();
