@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, Depends, Query, WebSocket, 
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
+import asyncio
 import json
 
 from database.db import get_session
@@ -79,6 +80,57 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str, db: Sessio
     accumulated_transcript = session_obj['session']['transcript'] or ""
     last_source = None
 
+    # Decouple STT processing from the receive loop: chunks are queued here
+    # and transcribed by a background worker at whatever pace Whisper can
+    # sustain, instead of blocking receive() on every chunk. This is what
+    # was causing the WS connection to stall/disconnect under slow or
+    # back-to-back-busy STT calls — the loop can now always keep draining
+    # the socket regardless of how far behind transcription falls.
+    chunk_queue: asyncio.Queue = asyncio.Queue()
+
+    async def process_queue():
+        nonlocal accumulated_transcript, last_source
+        while True:
+            item = await chunk_queue.get()
+            if item is None:
+                break
+            source, pcm_bytes = item
+
+            try:
+                text = await realtime_transcribe_chunk(pcm_bytes)
+            except Exception as e:
+                # A single chunk's STT failure (transient network blip, an
+                # odd-sized chunk, etc.) shouldn't tear down the whole
+                # recording session — skip this chunk and keep going.
+                print(f"Skipping chunk after transcribe error for session {session_id}: {e!r}")
+                continue
+
+            if not text:
+                continue
+
+            # Prefix with a speaker label only when the source changes, so a
+            # continuous run from the same source isn't relabeled every chunk.
+            labeled_text = text
+            if source != last_source:
+                label = "[System] " if source == "system" else "[You] "
+                labeled_text = label + text
+                last_source = source
+
+            # Append to running transcript
+            accumulated_transcript = (accumulated_transcript.rstrip() + " " + labeled_text).strip()
+
+            # Persist incrementally to DB
+            update_session_command(session_id, db, accumulated_transcript, "", "active")
+
+            try:
+                await websocket.send_json({"type": "transcription", "text": text, "source": source})
+            except Exception as e:
+                # Client may have already disconnected by the time a
+                # lagging-behind chunk finishes transcribing — nothing to do.
+                print(f"Failed to send transcription for session {session_id}: {e!r}")
+
+    worker_task = asyncio.create_task(process_queue())
+
     try:
         while True:
             message = await websocket.receive()
@@ -94,36 +146,9 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str, db: Sessio
             if "bytes" in message and message["bytes"]:
                 # Binary: [1 tag byte][raw PCM int16 chunk] from Tauri
                 frame = message["bytes"]
-                print(f"WS frame received: len={len(frame)} tag={frame[0]} first8={frame[:8].hex()}")
                 source = "system" if frame[0] == 1 else "mic"
                 pcm_bytes = frame[1:]
-
-                try:
-                    text = await realtime_transcribe_chunk(pcm_bytes)
-                except Exception as e:
-                    # A single chunk's STT failure (transient network blip, an
-                    # odd-sized chunk, etc.) shouldn't tear down the whole
-                    # recording session — skip this chunk and keep listening.
-                    print(f"Skipping chunk after transcribe error for session {session_id}: {e!r}")
-                    continue
-
-                if text:
-                    # Prefix with a speaker label only when the source changes,
-                    # so a continuous run from the same source isn't relabeled
-                    # on every chunk.
-                    labeled_text = text
-                    if source != last_source:
-                        label = "[System] " if source == "system" else "[You] "
-                        labeled_text = label + text
-                        last_source = source
-
-                    # Append to running transcript
-                    accumulated_transcript = (accumulated_transcript.rstrip() + " " + labeled_text).strip()
-
-                    # Persist incrementally to DB
-                    update_session_command(session_id, db, accumulated_transcript, "", "active")
-
-                    await websocket.send_json({"type": "transcription", "text": text, "source": source})
+                chunk_queue.put_nowait((source, pcm_bytes))
 
             elif "text" in message and message["text"]:
                 try:
@@ -141,3 +166,7 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str, db: Sessio
             await websocket.send_json({"type": "error", "message": str(e)})
         except Exception:
             pass
+    finally:
+        # Let the worker finish any chunks already queued, then stop it.
+        await chunk_queue.put(None)
+        await worker_task
