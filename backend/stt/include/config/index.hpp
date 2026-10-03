@@ -14,6 +14,7 @@ namespace lekhanai
         std::string llm_model_provider;
         int n_threads;
         int n_processors;
+        STT_MODEL stt_model;
     };
 
     class Environment

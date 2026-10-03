@@ -50,7 +50,7 @@ See [LICENSE](LICENSE) for details.
 ### whisper.cpp
 - **Purpose**: Fast, local speech-to-text engine
 - **Integration**: Added as a git submodule (`libraries/whisper.cpp`), built via CMake
-- **Branch**: v1.8.0_parallel (A modified version to handle)
+- **Branch**: v1.9.4_parallel (A modified version to handle audio batches)
 - **License**: [MIT](https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE)
 
 ### silero-vad

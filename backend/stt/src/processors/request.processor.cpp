@@ -41,7 +41,7 @@ namespace lekhanai
 
         voice_processor = VoiceProcessorFactory().create(
             config.model_path,
-            STT_MODEL::WHISPER,
+            config.stt_model,
             n_threads,
             n_processors);
 

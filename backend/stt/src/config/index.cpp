@@ -24,6 +24,19 @@ namespace lekhanai
         config.llm_model_provider = get("LLM_MODEL_PROVIDER");
         config.n_threads = getPositiveInt("N_THREADS");
         config.n_processors = getPositiveInt("N_PROCESSORS");
+        std::string stt_model_str = get("STT_MODEL");
+        if (stt_model_str == "WHISPER")
+        {
+            config.stt_model = STT_MODEL::WHISPER;
+        }
+        else if (stt_model_str == "PARAKEET")
+        {
+            config.stt_model = STT_MODEL::PARAKEET;
+        }
+        else
+        {
+            throw std::invalid_argument("Unsupported STT_MODEL: " + stt_model_str);
+        }
         return config;
     }
 

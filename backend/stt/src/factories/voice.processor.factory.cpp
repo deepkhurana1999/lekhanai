@@ -3,6 +3,7 @@
 #include "constants.hpp"
 #include "factories/voice.processor.factory.hpp"
 #include "processors/voice.processor/whisper.voice.processor.hpp"
+#include "processors/voice.processor/parakeet.voice.processor.hpp"
 
 namespace lekhanai
 {
@@ -12,8 +13,13 @@ namespace lekhanai
         if (type == STT_MODEL::WHISPER)
         {
             return new WhisperVoiceProcessor(model_path, n_threads, n_processors);
+        } else if (type == STT_MODEL::PARAKEET)
+        {
+            return new ParakeetVoiceProcessor(model_path, n_threads);
         }
-
-        throw std::invalid_argument("Unsupported voice processor type: " + type);
+        else
+        {
+            throw std::invalid_argument("Unsupported voice processor type: " + std::to_string(static_cast<int>(type)));
+        }
     }
 }

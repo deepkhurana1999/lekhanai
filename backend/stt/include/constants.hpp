@@ -4,7 +4,8 @@ namespace lekhanai
 {
     enum STT_MODEL
     {
-        WHISPER
+        WHISPER,
+        PARAKEET
     };
 
     enum VAD_MODEL
