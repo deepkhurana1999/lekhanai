@@ -69,18 +69,44 @@ async fn start_recording(
     // Channel: audio thread → WebSocket sender task
     let (pcm_tx, mut pcm_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
 
+    // Channel: WS read task → WS write task, for control frames (currently
+    // just Pong replies) that the read task can't send itself since the
+    // stream is split into separate read/write halves across two tasks.
+    let (ctrl_tx, mut ctrl_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
+
     // Store sender so stop_recording can close it
     {
         let mut sender_lock = state.ws_sender.lock().unwrap();
         *sender_lock = Some(pcm_tx.clone());
     }
 
-    // Spawn task: drain pcm_rx → WebSocket binary frames
+    // Spawn task: drain pcm_rx → WebSocket binary frames, and ctrl_rx → control frames
     tokio::spawn(async move {
-        while let Some(pcm_chunk) = pcm_rx.recv().await {
-            if let Err(e) = ws_write.send(Message::Binary(pcm_chunk)).await {
-                eprintln!("WS send error: {e}");
-                break;
+        let mut ctrl_closed = false;
+        loop {
+            tokio::select! {
+                maybe_chunk = pcm_rx.recv() => {
+                    match maybe_chunk {
+                        Some(pcm_chunk) => {
+                            if let Err(e) = ws_write.send(Message::Binary(pcm_chunk)).await {
+                                eprintln!("WS send error: {e}");
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                maybe_ctrl = ctrl_rx.recv(), if !ctrl_closed => {
+                    match maybe_ctrl {
+                        Some(ctrl_msg) => {
+                            if let Err(e) = ws_write.send(ctrl_msg).await {
+                                eprintln!("WS control send error: {e}");
+                                break;
+                            }
+                        }
+                        None => ctrl_closed = true,
+                    }
+                }
             }
         }
         // Flush and close
@@ -100,6 +126,13 @@ async fn start_recording(
                     }
                 }
                 Ok(Message::Close(_)) => break,
+                // Reply to server keepalive pings — otherwise the server's
+                // WS library (uvicorn/websockets) can treat this connection
+                // as dead after its ping_timeout and close it, even while
+                // actively recording.
+                Ok(Message::Ping(payload)) => {
+                    let _ = ctrl_tx.send(Message::Pong(payload));
+                }
                 Err(e) => {
                     eprintln!("WS recv error: {e}");
                     break;

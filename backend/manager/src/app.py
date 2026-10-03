@@ -83,12 +83,29 @@ async def websocket_transcribe(websocket: WebSocket, session_id: str, db: Sessio
         while True:
             message = await websocket.receive()
 
+            if message["type"] == "websocket.disconnect":
+                # Raw ASGI receive() delivers this exactly once when the
+                # client's connection actually drops; calling receive() again
+                # after it is a hard error (WebSocketDisconnected), not a
+                # retriable condition — stop the loop cleanly instead.
+                print(f"WebSocket disconnect message received for session {session_id}")
+                break
+
             if "bytes" in message and message["bytes"]:
                 # Binary: [1 tag byte][raw PCM int16 chunk] from Tauri
                 frame = message["bytes"]
+                print(f"WS frame received: len={len(frame)} tag={frame[0]} first8={frame[:8].hex()}")
                 source = "system" if frame[0] == 1 else "mic"
                 pcm_bytes = frame[1:]
-                text = await realtime_transcribe_chunk(pcm_bytes)
+
+                try:
+                    text = await realtime_transcribe_chunk(pcm_bytes)
+                except Exception as e:
+                    # A single chunk's STT failure (transient network blip, an
+                    # odd-sized chunk, etc.) shouldn't tear down the whole
+                    # recording session — skip this chunk and keep listening.
+                    print(f"Skipping chunk after transcribe error for session {session_id}: {e!r}")
+                    continue
 
                 if text:
                     # Prefix with a speaker label only when the source changes,
