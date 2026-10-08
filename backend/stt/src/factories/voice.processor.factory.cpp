@@ -15,7 +15,7 @@ namespace lekhanai
             return new WhisperVoiceProcessor(model_path, n_threads, n_processors);
         } else if (type == STT_MODEL::PARAKEET)
         {
-            return new ParakeetVoiceProcessor(model_path, n_threads);
+            return new ParakeetVoiceProcessor(model_path, n_threads, n_processors);
         }
         else
         {

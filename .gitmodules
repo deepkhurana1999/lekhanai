@@ -1,7 +1,7 @@
 [submodule "backend/stt/libraries/whisper.cpp"]
 	path = backend/stt/libraries/whisper.cpp
 	url = https://github.com/deepkhurana1999/whisper.cpp.git
-	branch = v1.8.0_parallel
+	branch = v1.9.4_parallel
 [submodule "backend/stt/libraries/libdatachannel"]
 	path = backend/stt/libraries/libdatachannel
 	url = https://github.com/paullouisageneau/libdatachannel.git
